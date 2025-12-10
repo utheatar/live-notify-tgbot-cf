@@ -11,18 +11,19 @@ export async function handleInit(req: Request, env: any) {
     const results: any = {};
     // include the calculated webhook URL in the response for visibility
     results.webhookUrl = webhookUrl;
+    // Set webhook
     try {
         results.setWebhook = await setWebhook(botToken, webhookUrl);
     } catch (e) {
         results.setWebhook = { error: String(e) };
     }
-
+    // Set commands
+    const commands = [
+        { command: 'add', description: 'Add uid. e.g. /add 123' },
+        { command: 'rm', description: 'Remove uid. e.g. /rm 123' },
+        { command: 'ls', description: 'List uids' },
+    ];
     try {
-        const commands = [
-            { command: 'add', description: 'Add uid: /add 123' },
-            { command: 'rm', description: 'Remove uid: /rm 123' },
-            { command: 'ls', description: 'List uids' },
-        ];
         results.setCommands = await setMyCommands(botToken, commands);
     } catch (e) {
         results.setCommands = { error: String(e) };

@@ -39,8 +39,15 @@ export async function handleTgWebhook(req: Request, env: Env) {
 
     if (cmd === 'ls') {
         const list = await getList(env.liveinfo);
-        const text = list.length ? list.join('\n') : '(empty)';
-        await sendMessage(env.BOT_TOKEN, chatId, `List:\n${text}`);
+        if (!list || list.length === 0) {
+            await sendMessage(env.BOT_TOKEN, chatId, '(empty)');
+            return new Response('listed');
+        }
+
+        for (const item of list) {
+            // send one message per list element
+            await sendMessage(env.BOT_TOKEN, chatId, String(item));
+        }
         return new Response('listed');
     }
 
