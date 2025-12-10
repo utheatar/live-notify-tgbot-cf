@@ -1,6 +1,6 @@
 import { getWebhookInfo } from '../utils/telegram';
 
-export async function handleRoot(req: Request, env: any) {
+export async function handleRoot(req: Request, env: Env) {
     const botToken = env.BOT_TOKEN;
     let info: any = { error: 'BOT_TOKEN not configured' };
     if (botToken) {

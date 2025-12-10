@@ -20,7 +20,7 @@ import { handleInit } from './handlers/tgbotInit';
 import { handleTgWebhook } from './handlers/tgbotFunc';
 
 export default {
-	async fetch(req: Request, env: any, ctx: any) {
+	async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
 		const url = new URL(req.url);
 		const pathname = url.pathname || '/';
 
@@ -35,8 +35,8 @@ export default {
 		}
 	},
 
-	async scheduled(event: any, env: any, ctx: any): Promise<void> {
+	async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
 		// Placeholder scheduled handler. Use this to trigger pushes to chats.
-		console.log(`scheduled trigger fired at ${event.cron}`);
+		console.log(`scheduled trigger fired at ${controller.scheduledTime}`);
 	},
 } satisfies ExportedHandler<Env>;
