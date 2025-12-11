@@ -49,7 +49,7 @@ export async function handleTgWebhook(req: Request, env: Env) {
         // try to get uname for better feedback
         let uname = '';
         try {
-            const infoResp = await fetchLiveInfos([uid]);
+            const infoResp: any = await fetchLiveInfos([uid]);
             if (infoResp && infoResp.apisuccess && infoResp.data) {
                 const entry = infoResp.data[String(uid)] || infoResp.data[Number(uid)];
                 uname = entry && entry.uname ? entry.uname : '';
@@ -79,7 +79,7 @@ export async function handleTgWebhook(req: Request, env: Env) {
         // try to fetch uname
         let uname = '';
         try {
-            const infoResp = await fetchLiveInfos([uid]);
+            const infoResp: any = await fetchLiveInfos([uid]);
             if (infoResp && infoResp.apisuccess && infoResp.data) {
                 const entry = infoResp.data[String(uid)] || infoResp.data[Number(uid)];
                 uname = entry && entry.uname ? entry.uname : '';

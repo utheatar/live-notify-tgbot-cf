@@ -32,7 +32,6 @@ export async function runScheduledPush(env: Env) {
 
     // read uplist from KVStore
     const uplist = (await BLStore.getJson<number[] | string[]>(KEY_USERLIST)) || [];
-
     if (!uplist || uplist.length === 0) {
         console.log('runScheduledPush: uplist empty');
         return;
