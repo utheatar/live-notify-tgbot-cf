@@ -70,7 +70,7 @@ async function getBLInfos(kv: KVNamespace): Promise<string> {
         else offlineMessages.push(formatted);
     }
 
-    // update last live statuses and persist
+    // 节约KV写入次数
     if (changedCount > 0) {
         const nextPrev: Record<string, number> = {};
         for (const k of Object.keys(cur)) {
@@ -86,8 +86,7 @@ async function getBLInfos(kv: KVNamespace): Promise<string> {
     const ordered = [...liveMessages, ...loopMessages, ...offlineMessages];
     console.log("[debug]bl live info push: ", ordered);
 
-    // return ordered.length ? ordered.join('\n\n') : '';
-    return messages.length ? messages.join('\n\n') : '';
+    return ordered.length ? ordered.join('\n\n') : '';
 }
 
 async function getDYInfos(kv: KVNamespace): Promise<string> {
@@ -214,10 +213,16 @@ export async function runScheduledPush(env: Env) {
         return;
     }
 
-    // send message
+    // send message (use plain text by default to avoid MarkdownV2 escaping issues)
     try {
-        console.log('runScheduledPush: sent messages as below:', finalText);
-        await sendMessage(botToken, chatId, finalText, 'MarkdownV2');
+        console.log('runScheduledPush: sending messages as below:', finalText);
+        const resp = await sendMessage(botToken, chatId, finalText);
+        // Telegram API returns JSON with an `ok` boolean
+        if (!resp || resp.ok !== true) {
+            console.log('runScheduledPush: sendMessage responded with error', resp);
+        } else {
+            console.log('runScheduledPush: sendMessage ok', { message_id: resp.result?.message_id });
+        }
     } catch (e) {
         console.log('runScheduledPush: sendMessage failed', String(e));
     }
