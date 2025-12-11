@@ -50,7 +50,7 @@ async function getBLInfos(kv: KVNamespace): Promise<string> {
 
         const statusTexts: Record<number, string> = {
             0: '已下播',
-            1: '正在直播！',
+            1: '*正在直播！*',
             2: '轮播中',
         };
         const statusText = statusTexts[live_status] || `status: ${live_status}`;
@@ -122,7 +122,7 @@ async function getDYInfos(kv: KVNamespace): Promise<string> {
         if (!isLiveStatusChanged) continue;
         const statusTexts: Record<number, string> = {
             0: '已下播',
-            1: '正在直播！',
+            1: '*正在直播！*',
             2: '轮播中',
         };
         const statusText = statusTexts[Number(cur.live_status)] || `status: ${cur.live_status}`;
@@ -194,7 +194,7 @@ export async function runScheduledPush(env: Env) {
     }
 
     // combine messages into one and send: BL first (if any), then DY
-    const finalText = ((blMessages ? `${blMessages}` : '') + (dyMessages ? `\n---\n\n${dyMessages}` : '')).trim();
+    const finalText = ((blMessages ? `_Bilibili_\n${blMessages}` : '') + (dyMessages ? `_Douyin_\n${dyMessages}` : '')).trim();
     if (!finalText) {
         console.log('runScheduledPush: no status changes to send');
         return;
