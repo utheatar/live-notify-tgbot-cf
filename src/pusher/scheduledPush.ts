@@ -1,7 +1,140 @@
 import { sendMessage } from '../utils/telegram';
+import { KVStore, KEY_USERLIST, KEY_LAST_INFO_STATUS } from '../storage/KVStore';
 import { fetchLiveInfos } from '../utils/bilibili';
-import { KVStore } from '../storage/KVStore';
-import { KEY_USERLIST, KEY_LAST_INFO_STATUS } from '../storage/KVStore';
+import { fetchDYLiveInfo } from '../utils/douyin';
+
+
+async function getBLInfos(kv: KVNamespace): Promise<string> {
+    // init KVStore for BL
+    const BLStore: KVStore = new KVStore(kv, 'BL');
+    // read uplist from KVStore
+    const uplist = (await BLStore.getJson<number[] | string[]>(KEY_USERLIST)) || [];
+    if (!uplist || uplist.length === 0) {
+        console.log('getBLInfos: uplist empty');
+        return '';
+    }
+
+    // fetch current live infos
+    let apiResp: any;
+    try {
+        apiResp = await fetchLiveInfos(uplist);
+    } catch (e) {
+        console.log('getBLInfos: fetch error', String(e));
+        return '';
+    }
+
+    if (!apiResp || !apiResp.apisuccess || !apiResp.data) {
+        console.log('getBLInfos: api fetch failed', apiResp);
+        return '';
+    }
+
+    const cur = apiResp.data;
+    // read previous statuses (mapping uid -> live_status) from KVStore
+    let prev = (await BLStore.getJson<Record<string, number>>(KEY_LAST_INFO_STATUS)) || {};
+    const messages: string[] = [];
+
+    for (const uidKey of Object.keys(cur)) {
+        const info = cur[uidKey];
+        if (!info) continue;
+        const uid = String(info.uid ?? uidKey);
+        const uname = info.uname ?? '';
+        const title = info.title ?? '';
+        const tags = info.tags ?? '';
+        const live_status = Number(info.live_status ?? info.livestatus ?? 0);
+
+        const isLiveStatusChanged = Number(prev[uid]) !== live_status;
+
+        if (isLiveStatusChanged) {
+            const statusTexts: Record<number, string> = {
+                0: '已下播',
+                1: '正在直播！',
+                2: '轮播中',
+            };
+            const statusText = statusTexts[live_status] || `status: ${live_status}`;
+            const header = `${uname} - ${statusText}`;
+            const body = title ? `${title}` : '';
+            const footer = tags ? `${tags}` : '';
+            const parts = [header];
+            if (body && live_status !== 0) parts.push(body);
+            if (footer && live_status !== 0) parts.push(footer);
+            messages.push(parts.join('\n'));
+        }
+    }
+
+    // update last live statuses and persist
+    const nextPrev: Record<string, number> = {};
+    for (const k of Object.keys(cur)) {
+        nextPrev[k] = Number(cur[k].live_status ?? cur[k].livestatus ?? 0);
+    }
+    try {
+        await BLStore.setJson(KEY_LAST_INFO_STATUS, nextPrev);
+    } catch (e) {
+        console.log('getBLInfos: failed to write last statuses', String(e));
+    }
+
+    return messages.length ? messages.join('\n\n') : '';
+}
+
+async function getDYInfos(kv: KVNamespace): Promise<string> {
+    // init KVStore
+    const DYStore: KVStore = new KVStore(kv, 'DY');
+    // read userlist from KVStore
+    const sec_user_ids = (await DYStore.getJson<number[] | string[]>(KEY_USERLIST)) || [];
+    if (!sec_user_ids || sec_user_ids.length === 0) {
+        console.log('getDYInfos: userlist empty');
+        return '';
+    }
+
+    let DYInfos = '';
+
+    // read previous statuses (mapping sec_user_id -> live_status) from KVStore
+    const prev = (await DYStore.getJson<Record<string, number>>(KEY_LAST_INFO_STATUS)) || {};
+    // will persist next statuses here
+    const nextPrev: Record<string, number> = {};
+
+    // fetch current live infos per sec_user_id
+    for (const sec_user_id of sec_user_ids) {
+        let apiResp: any;
+        try {
+            apiResp = await fetchDYLiveInfo(String(sec_user_id));
+        } catch (e) {
+            console.log('getDYInfos: fetch error', String(e));
+            continue;
+        }
+        if (!apiResp || !apiResp.apisuccess || !apiResp.data) {
+            console.log('getDYInfos: api fetch failed', apiResp);
+            continue;
+        }
+        const cur: any = apiResp.data;
+        // record current status for persistence
+        nextPrev[String(sec_user_id)] = Number(cur.live_status ?? 0);
+        // status changed -> prepare message
+        if (Number(cur.live_status) !== Number(prev[String(sec_user_id)])) {
+            const statusTexts: Record<number, string> = {
+                0: '已下播',
+                1: '正在直播！',
+                2: '轮播中',
+            };
+            const statusText = statusTexts[Number(cur.live_status)] || `status: ${cur.live_status}`;
+            const header = `${cur.nickname || ''} - ${statusText}`;
+            const body = cur.title || '';
+            const iplocation = cur.ip_location || '';
+            const parts = [header];
+            if (body) parts.push(body);
+            if (iplocation) parts.push(iplocation);
+            DYInfos += parts.join('\n') + '\n\n';
+        }
+    }
+
+    // persist latest DY statuses
+    try {
+        await DYStore.setJson(KEY_LAST_INFO_STATUS, nextPrev);
+    } catch (e) {
+        console.log('getDYInfos: failed to write last statuses', String(e));
+    }
+
+    return DYInfos.trim();
+}
 
 /**
  * Main scheduled runner. Reads `uplist` from KV (env.liveinfo), fetches live infos,
@@ -27,91 +160,37 @@ export async function runScheduledPush(env: Env) {
         return;
     }
 
-    // init KVStore
-    const BLStore: KVStore = new KVStore(kv, 'BL');
-
-    // read uplist from KVStore
-    const uplist = (await BLStore.getJson<number[] | string[]>(KEY_USERLIST)) || [];
-    if (!uplist || uplist.length === 0) {
-        console.log('runScheduledPush: uplist empty');
-        return;
-    }
-
-    // fetch current live infos
-    let apiResp: any;
+    // extract BL messages
+    let blMessages = '';
     try {
-        apiResp = await fetchLiveInfos(uplist);
+        blMessages = await getBLInfos(kv);
     } catch (e) {
-        console.log('runScheduledPush: fetch error', String(e));
-        return;
+        console.log('runScheduledPush: getBLInfos error', String(e));
+    }
+    if (!blMessages) {
+        console.log('runScheduledPush: no BL status changes');
+        // continue to DY check anyway
     }
 
-    if (!apiResp || !apiResp.apisuccess || !apiResp.data) {
-        console.log('runScheduledPush: api fetch failed', apiResp);
-        return;
-    }
-
-    const cur = apiResp.data;
-    // read previous statuses (mapping uid -> live_status) from KVStore
-    let prev = (await BLStore.getJson<Record<string, number>>(KEY_LAST_INFO_STATUS)) || {};
-    // const isFirstRun = !prev || Object.keys(prev).length === 0;
-    const messages: string[] = [];
-    for (const uidKey of Object.keys(cur)) {
-        const info = cur[uidKey];
-        if (!info) continue;
-        // get fields
-        const uid = String(info.uid ?? uidKey);
-        const uname = info.uname ?? '';
-        const title = info.title ?? '';
-        const tags = info.tags ?? '';
-        const live_status = Number(info.live_status ?? info.livestatus ?? 0);
-        const room_id = info.room_id ?? info.roomid ?? 0;
-        const live_time = Number(info.live_time ?? info.livetime ?? 0);
-
-        const isLiveStatusChanged = Number(prev[uid]) !== live_status;
-
-        // status changed -> prepare message
-        if (isLiveStatusChanged) {
-            const statusTexts: Record<number, string> = {
-                0: '已下播',
-                1: '正在直播！',
-                2: '轮播中',
-            }
-            const statusText = statusTexts[live_status] || `status: ${live_status}`;
-            const header = `${uname}（${uid}）${statusText}`;
-            const body = title ? `${title}` : '';
-            const footer = tags ? `${tags}` : '';
-            const parts = [header];
-            // include title/tags when status is active (1=live, 2=looping)
-            if (body && live_status !== 0) parts.push(body);
-            if (footer && live_status !== 0) parts.push(footer);
-            messages.push(parts.join('\n'));
-        }
-    }
-
-    // update last live statuses
-    prev = {};
-    for (const k of Object.keys(cur)) {
-        prev[k] = cur[k].live_status;
-    }
-
-    // persist latest statuses
+    // get DY infos
+    let dyMessages = '';
     try {
-        await BLStore.setJson(KEY_LAST_INFO_STATUS, prev);
+        dyMessages = await getDYInfos(kv);
     } catch (e) {
-        console.log('runScheduledPush: failed to write last_live_infos', String(e));
+        console.log('runScheduledPush: getDYInfos error', String(e));
     }
 
-    if (messages.length === 0) {
-        console.log('runScheduledPush: no status changes');
+    // combine messages into one and send: BL first (if any), then DY
+    const finalText = ((blMessages ? `${blMessages}` : '') + (dyMessages ? `\n\n${dyMessages}` : '')).trim();
+    if (!finalText) {
+        console.log('runScheduledPush: no status changes to send');
         return;
     }
 
-    // combine messages into one and send
-    const finalText = messages.join('\n\n');
+    // send message
     try {
         await sendMessage(botToken, chatId, finalText);
-        console.log('runScheduledPush: sent messages', messages.length);
+        console.log('runScheduledPush: sent messages', { bl: !!blMessages, dy: !!dyMessages });
     } catch (e) {
         console.log('runScheduledPush: sendMessage failed', String(e));
     }
