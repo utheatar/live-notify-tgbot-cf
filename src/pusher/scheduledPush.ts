@@ -1,25 +1,7 @@
 import { getList, readByKey, writeKV } from '../storage/kv';
 import { sendMessage } from '../utils/telegram';
-
-const API_ENDPOINT = 'https://api-forwarding-vc.vercel.app/api/bili/liveinfos';
-
-/**
- * Fetch liveinfos for given uids via GET (uids[] params)
- */
-async function fetchLiveInfos(uids: string[] | number[]) {
-    if (!uids || uids.length === 0) return null;
-    // Use POST with JSON body to avoid excessively long URLs
-    const url = API_ENDPOINT;
-    const body = { uids: uids.map((u) => Number(u)) };
-    const resp = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-    });
-    if (!resp.ok) throw new Error(`liveinfos fetch failed: ${resp.status}`);
-    const json = await resp.json();
-    return json;
-}
+import { fetchLiveInfos } from '../utils/bilibili';
+import { KVStore } from '../storage/KVStore';
 
 /**
  * Main scheduled runner. Reads `uplist` from KV (env.liveinfo), fetches live infos,
@@ -45,7 +27,12 @@ export async function runScheduledPush(env: Env) {
         return;
     }
 
-    const uplist = await getList(kv);
+    // init KVStore
+    const kvStore: KVStore = new KVStore(kv, 'BL');
+
+    // const uplist = await getList(kv);
+    const uplist = await kvStore.getJson<[]>('uplist');
+
     if (!uplist || uplist.length === 0) {
         console.log('runScheduledPush: uplist empty');
         return;
