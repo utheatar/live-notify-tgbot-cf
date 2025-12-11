@@ -31,9 +31,10 @@ async function getBLInfos(kv: KVNamespace): Promise<string> {
     const cur = apiResp.data;
     // read previous statuses (mapping uid -> live_status) from KVStore
     let prev = (await BLStore.getJson<Record<string, number>>(KEY_LAST_INFO_STATUS)) || {};
-    const liveMessages: string[] = [];
-    const loopMessages: string[] = [];
-    const offlineMessages: string[] = [];
+    let liveMessages: string[] = [];
+    let loopMessages: string[] = [];
+    let offlineMessages: string[] = [];
+    const messages: string[] = [];
     // count of changed statuses
     let changedCount = 0;
 
@@ -63,19 +64,18 @@ async function getBLInfos(kv: KVNamespace): Promise<string> {
         if (body && live_status !== 0) parts.push(body);
         if (footer && live_status !== 0) parts.push(footer);
         const formatted = parts.join('\n');
-
+        messages.push(formatted);
         if (live_status === 1) liveMessages.push(formatted);
         else if (live_status === 2) loopMessages.push(formatted);
         else offlineMessages.push(formatted);
     }
 
     // update last live statuses and persist
-    const nextPrev: Record<string, number> = {};
-    for (const k of Object.keys(cur)) {
-        nextPrev[k] = Number(cur[k].live_status ?? cur[k].livestatus ?? 0);
-    }
-
     if (changedCount > 0) {
+        const nextPrev: Record<string, number> = {};
+        for (const k of Object.keys(cur)) {
+            nextPrev[k] = Number(cur[k].live_status ?? cur[k].livestatus ?? 0);
+        }
         try {
             await BLStore.setJson(KEY_LAST_INFO_STATUS, nextPrev);
         } catch (e) {
@@ -84,7 +84,8 @@ async function getBLInfos(kv: KVNamespace): Promise<string> {
     }
 
     const ordered = [...liveMessages, ...loopMessages, ...offlineMessages];
-    return ordered.length ? ordered.join('\n\n') : '';
+    // return ordered.length ? ordered.join('\n\n') : '';
+    return messages.length ? messages.join('\n\n') : '';
 }
 
 async function getDYInfos(kv: KVNamespace): Promise<string> {
