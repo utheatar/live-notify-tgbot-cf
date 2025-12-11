@@ -18,6 +18,7 @@
 import { handleRoot } from './handlers/tgbot';
 import { handleInit } from './handlers/tgbotInit';
 import { handleTgWebhook } from './handlers/tgbotFunc';
+import { runScheduledPush } from './pusher/scheduledPush';
 
 export default {
 	async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -36,7 +37,11 @@ export default {
 	},
 
 	async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
-		// Placeholder scheduled handler. Use this to trigger pushes to chats.
 		console.log(`scheduled trigger fired at ${controller.scheduledTime}`);
+		try {
+			await runScheduledPush(env);
+		} catch (e) {
+			console.log('scheduled handler error', String(e));
+		}
 	},
 } satisfies ExportedHandler<Env>;
