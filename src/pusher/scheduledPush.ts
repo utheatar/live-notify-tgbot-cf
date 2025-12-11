@@ -131,7 +131,7 @@ async function getDYInfos(kv: KVNamespace): Promise<string> {
         const iplocation = cur.ip_location || '';
         const parts = [header];
         if (body) parts.push(body);
-        if (iplocation) parts.push(iplocation);
+        if (iplocation && Number(cur.live_status) === 1) parts.push(iplocation);
         const formatted = parts.join('\n');
         if (Number(cur.live_status) === 1) liveMessages.push(formatted);
         else if (Number(cur.live_status) === 2) loopMessages.push(formatted);
