@@ -1,6 +1,6 @@
 import { sendMessage } from '../utils/telegram';
 import { KVStore } from '../storage/KVStore';
-import { fetchLiveInfos } from '../utils/bilibili';
+import { fetchLiveInfosVC } from '../utils/bilibili';
 import { fetchDYLiveInfo } from '../utils/douyin';
 import {
     COMMAND_LIST_ALLUSER,
@@ -51,7 +51,7 @@ export async function handleTgWebhook(req: Request, env: Env) {
         // try to get uname for better feedback
         let uname = '';
         try {
-            const infoResp: any = await fetchLiveInfos([uid]);
+            const infoResp: any = await fetchLiveInfosVC([uid]);
             if (infoResp && infoResp.apisuccess && infoResp.data) {
                 const entry = infoResp.data[String(uid)] || infoResp.data[Number(uid)];
                 uname = entry && entry.uname ? entry.uname : '';
@@ -81,7 +81,7 @@ export async function handleTgWebhook(req: Request, env: Env) {
         // try to fetch uname
         let uname = '';
         try {
-            const infoResp: any = await fetchLiveInfos([uid]);
+            const infoResp: any = await fetchLiveInfosVC([uid]);
             if (infoResp && infoResp.apisuccess && infoResp.data) {
                 const entry = infoResp.data[String(uid)] || infoResp.data[Number(uid)];
                 uname = entry && entry.uname ? entry.uname : '';
@@ -115,7 +115,7 @@ export async function handleTgWebhook(req: Request, env: Env) {
         // fetch names in batch
         let infoResp: any = null;
         try {
-            infoResp = await fetchLiveInfos(list);
+            infoResp = await fetchLiveInfosVC(list);
         } catch (e) {
             console.log('fetch list unames error', String(e));
         }

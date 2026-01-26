@@ -52,7 +52,7 @@ export default {
 	},
 
 	async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
-		console.log(`scheduled trigger fired at ${controller.scheduledTime}`);
+		// console.log(`scheduled trigger fired at ${controller.scheduledTime}`);
 		try {
 			await runScheduledPush(env);
 		} catch (e) {

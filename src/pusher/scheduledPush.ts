@@ -1,6 +1,6 @@
 import { sendMessage } from '../utils/telegram';
 import { KVStore, KEY_USERLIST, KEY_LAST_INFO_STATUS } from '../storage/KVStore';
-import { fetchLiveInfos } from '../utils/bilibili';
+import { fetchLiveInfosVC } from '../utils/bilibili';
 import { fetchDYLiveInfo } from '../utils/douyin';
 
 
@@ -17,7 +17,7 @@ async function getBLInfos(kv: KVNamespace): Promise<string> {
     // fetch current live infos
     let apiResp: any;
     try {
-        apiResp = await fetchLiveInfos(userlist);
+        apiResp = await fetchLiveInfosVC(userlist);
     } catch (e) {
         console.log('getBLInfos: fetch error', String(e));
         return '';
