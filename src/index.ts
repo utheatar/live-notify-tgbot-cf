@@ -19,6 +19,7 @@ import { handleRoot } from './handlers/tgbot';
 import { handleInit } from './handlers/tgbotInit';
 import { handleTgWebhook } from './handlers/tgbotFunc';
 import { runScheduledPush } from './pusher/scheduledPush';
+import API_TEST_HTML from './templates/api-test.html';
 
 export default {
 	async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -26,9 +27,23 @@ export default {
 		const pathname = url.pathname || '/';
 
 		try {
+			// API 测试页面
+			if (pathname === '/api-test' || pathname === '/api-test.html') {
+				return new Response(API_TEST_HTML, {
+					headers: { 'Content-Type': 'text/html;charset=utf-8' }
+				});
+			}
+
 			if (pathname === '/tgbot') return handleRoot(req, env);
 			if (pathname === '/tgbot/init') return handleInit(req, env);
 			if (pathname === '/tgbot/func') return handleTgWebhook(req, env);
+
+			// 默认显示测试页面
+			if (pathname === '/' || pathname === '/index.html') {
+				return new Response(API_TEST_HTML, {
+					headers: { 'Content-Type': 'text/html;charset=utf-8' }
+				});
+			}
 
 			return new Response('Not Found such path ' + pathname, { status: 404 });
 		} catch (e) {

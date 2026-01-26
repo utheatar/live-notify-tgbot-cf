@@ -216,7 +216,7 @@ export async function runScheduledPush(env: Env) {
     // send message (use plain text by default to avoid MarkdownV2 escaping issues)
     try {
         console.log('runScheduledPush: sending messages as below:', finalText);
-        const resp = await sendMessage(botToken, chatId, finalText);
+        const resp: any = await sendMessage(botToken, chatId, finalText);
         // Telegram API returns JSON with an `ok` boolean
         if (!resp || resp.ok !== true) {
             console.log('runScheduledPush: sendMessage responded with error', resp);
