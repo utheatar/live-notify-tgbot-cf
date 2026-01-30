@@ -1,7 +1,8 @@
 import { sendMessage } from '../utils/telegram';
 import { KVStore, KEY_USERLIST, KEY_LAST_INFO_STATUS } from '../storage/KVStore';
+import { D1Store } from '../storage/D1DB';
 import { fetchLiveInfosVC } from '../utils/bilibili';
-import { fetchDYLiveInfo } from '../utils/douyin';
+import { getDYUserInfo } from '../utils/douyin';
 
 
 async function getBLInfos(kv: KVNamespace): Promise<string> {
@@ -89,9 +90,11 @@ async function getBLInfos(kv: KVNamespace): Promise<string> {
     return ordered.length ? ordered.join('\n\n') : '';
 }
 
-async function getDYInfos(kv: KVNamespace): Promise<string> {
+async function getDYInfos(kv: KVNamespace, env: Env): Promise<string> {
     // init KVStore
     const DYStore: KVStore = new KVStore(kv, 'DY');
+    // init D1Store for database writes
+    const dbStore = new D1Store(env.streamers);
     // read userlist from KVStore
     const sec_user_ids = (await DYStore.getJson<number[] | string[]>(KEY_USERLIST)) || [];
     if (!sec_user_ids || sec_user_ids.length === 0) {
@@ -105,44 +108,66 @@ async function getDYInfos(kv: KVNamespace): Promise<string> {
 
     // read previous statuses (mapping sec_user_id -> live_status) from KVStore
     const prev = (await DYStore.getJson<Record<string, number>>(KEY_LAST_INFO_STATUS)) || {};
-    // will persist next statuses here
+    // Persist next statuses here. All statuses will be written back at once to save KV writes
     const nextPrev: Record<string, number> = {};
     // count changed statuses
     let changedCount = 0;
+
+    // get env vars for Douyin API
+    const cookie = env.DY_COOKIE1 || '';
+    const userAgent = env.USER_AGENT || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36';
+
     // fetch current live infos per sec_user_id
     for (const sec_user_id of sec_user_ids) {
-        let apiResp: any;
+        let cur: any;
         try {
-            apiResp = await fetchDYLiveInfo(String(sec_user_id));
+            cur = await getDYUserInfo(String(sec_user_id), cookie, userAgent);
         } catch (e) {
             console.log('getDYInfos: fetch error', String(e));
             continue;
         }
-        if (!apiResp || !apiResp.apisuccess || !apiResp.data) {
-            console.log('getDYInfos: api fetch failed', apiResp);
+        if (!cur) {
+            console.log('getDYInfos: api fetch failed for', sec_user_id);
             continue;
         }
-        const cur: any = apiResp.data;
+        // console.log(cur);
+        const live_status = cur.live_status ?? 0;
+        const prevStatus = prev[String(sec_user_id)];
+
+        // 判断直播状态是否变化
+        const isLiveStatusChanged = prevStatus === undefined || prevStatus !== live_status;
+        // 若无变化则跳过
+        if (!isLiveStatusChanged) {
+            // still record current status for persistence
+            nextPrev[String(sec_user_id)] = live_status;
+            continue;
+        }
+        // 若直播状态有变化，则进行下述处理
+        changedCount += 1;
         // record current status for persistence
-        nextPrev[String(sec_user_id)] = Number(cur.live_status ?? 0);
-        // status changed -> prepare message
-        const isLiveStatusChanged = Number(cur.live_status) !== Number(prev[String(sec_user_id)]);
-        if (!isLiveStatusChanged) { continue } else { changedCount += 1; }
+        nextPrev[String(sec_user_id)] = live_status;
+        // write to database
+        try {
+            await dbStore.insertUserDY(cur);
+        } catch (e) {
+            console.log('getDYInfos: failed to write to database', String(e));
+        }
+        // format message to send
         const statusTexts: Record<number, string> = {
             0: '已下播',
             1: '*正在直播！*',
             2: '轮播中',
         };
-        const statusText = statusTexts[Number(cur.live_status)] || `status: ${cur.live_status}`;
+        const statusText = statusTexts[Number(live_status)] || `status: ${live_status}`;
         const header = `${cur.nickname || ''} - ${statusText}`;
-        const body = cur.title || '';
+        const signature = cur.signature || '';
         const iplocation = cur.ip_location || '';
         const parts = [header];
-        if (body) parts.push(body);
-        if (iplocation && Number(cur.live_status) === 1) parts.push(iplocation);
+        if (signature) parts.push(`> ${signature}`);
+        if (iplocation && live_status === 1) parts.push(iplocation);
         const formatted = parts.join('\n');
-        if (Number(cur.live_status) === 1) liveMessages.push(formatted);
-        else if (Number(cur.live_status) === 2) loopMessages.push(formatted);
+        if (live_status === 1) liveMessages.push(formatted);
+        else if (live_status === 2) loopMessages.push(formatted);
         else offlineMessages.push(formatted);
     }
 
@@ -197,14 +222,14 @@ export async function runScheduledPush(env: Env) {
 
     // get DY infos
     let dyMessages = '';
-    // try {
-    //     dyMessages = await getDYInfos(kv);
-    // } catch (e) {
-    //     console.log('runScheduledPush: getDYInfos error', String(e));
-    // }
-    // if (!dyMessages) {
-    //     console.log('runScheduledPush: no DY status changes');
-    // }
+    try {
+        dyMessages = await getDYInfos(kv, env);
+    } catch (e) {
+        console.log('runScheduledPush: getDYInfos error', String(e));
+    }
+    if (!dyMessages) {
+        console.log('runScheduledPush: no DY status changes');
+    }
 
     // combine messages into one and send: BL first (if any), then DY
     const finalText = ((blMessages ? `_Bilibili_\n${blMessages}` : '') + (dyMessages ? `_Douyin_\n${dyMessages}` : '')).trim();
