@@ -1,7 +1,7 @@
 import { sendMessage } from '../utils/telegram';
 import { KVStore } from '../storage/KVStore';
 import { fetchLiveInfosVC } from '../utils/bilibili';
-import { fetchDYLiveInfo } from '../utils/douyin';
+import { fetchDYLiveInfo, getDYUserInfo } from '../utils/douyin';
 import {
     COMMAND_LIST_ALLUSER,
     COMMAND_ADD_BLUSER,
@@ -12,6 +12,7 @@ import {
     COMMAND_LIST_DYUSER,
 } from '../constants/commands';
 import { KEY_USERLIST, KEY_LAST_INFO_STATUS } from '../storage/KVStore';
+import { DYUser } from '../datamodel/DY';
 
 
 export async function handleTgWebhook(req: Request, env: Env) {
@@ -141,10 +142,13 @@ export async function handleTgWebhook(req: Request, env: Env) {
         const sec = parts[1];
         let nickname = '';
         try {
-            const resp: any = await fetchDYLiveInfo(sec);
-            if (resp && resp.apisuccess && resp.data) {
-                const entry = resp.data;
-                nickname = entry[nickname] ?? entry?.nickname ?? entry?.uname ?? entry?.unique_id ?? '';
+            const resp: any = await getDYUserInfo(sec, env.DY_COOKIE1, env.USER_AGENT);
+            if (resp && resp.sec_uid && resp.nickname) {
+                const entry = resp;
+                nickname = entry.nickname ?? entry?.uname ?? entry?.unique_id ?? 'undefined';
+            } else {
+                await sendMessage(env.BOT_TOKEN, chatId, 'Douyin user not found.');
+                throw new Error('Douyin user not found');
             }
         } catch (e) {
             console.log('dy fetch nickname error', String(e));
@@ -170,10 +174,13 @@ export async function handleTgWebhook(req: Request, env: Env) {
         const sec = parts[1];
         let nickname = '';
         try {
-            const resp: any = await fetchDYLiveInfo(sec);
-            if (resp && resp.apisuccess && resp.data) {
-                const entry = resp.data;
-                nickname = entry?.nickname ?? entry?.uname ?? entry?.unique_id ?? '';
+            const resp: any = await getDYUserInfo(sec, env.DY_COOKIE1, env.USER_AGENT);
+            if (resp && resp.sec_uid && resp.nickname) {
+                const entry = resp;
+                nickname = entry.nickname ?? entry?.uname ?? entry?.unique_id ?? '';
+            } else {
+                await sendMessage(env.BOT_TOKEN, chatId, 'Douyin user not found.');
+                throw new Error('Douyin user not found');
             }
         } catch (e) {
             console.log('dy fetch nickname error', String(e));
@@ -204,10 +211,12 @@ export async function handleTgWebhook(req: Request, env: Env) {
         for (const sec of list2) {
             let nickname = '';
             try {
-                const infoRespDy: any = await fetchDYLiveInfo(sec);
-                if (infoRespDy && infoRespDy.apisuccess && infoRespDy.data) {
-                    const entry = infoRespDy.data;
-                    nickname = entry?.nickname ?? entry?.uname ?? entry?.unique_id ?? '';
+                const infoRespDy: any = await getDYUserInfo(sec, env.DY_COOKIE1, env.USER_AGENT);
+                if (infoRespDy && infoRespDy.sec_uid && infoRespDy.nickname) {
+                    const entry = infoRespDy;
+                    nickname = entry.nickname ?? entry?.uname ?? entry?.unique_id ?? '';
+                } else {
+                    nickname = 'undefined';
                 }
             } catch (e) {
                 console.log('dy fetch nickname error', String(e));
