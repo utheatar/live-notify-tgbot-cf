@@ -2,10 +2,26 @@ import { douyinSign } from './sign';
 import { getBaseParams } from './defaultConfig';
 
 
-// 核心获取函数
+/**
+ * 获取抖音用户主页资料
+ * @param {string} sec_uid 抖音主播的sec_uid，可从主页链接Url中获取
+ * @param {string} cookie 抖音cookie
+ * @param {string} userAgent 浏览器的UA
+ * @returns {Promise<Response>} 抖音接口的Response
+ */
 export async function fetchDouyinUserProfile(sec_uid: string, cookie: string, userAgent: string): Promise<Response> {
-    // 你的 BaseUrl
     const baseUrl = 'https://www.douyin.com/aweme/v1/web/user/profile/other/';
+
+    // 检查函数参数
+    if (!sec_uid || sec_uid.length === 0) {
+        return new Response('sec_uid is required', { status: 400 });
+    }
+    if (!cookie || cookie.length === 0) {
+        return new Response('cookie is required', { status: 400 });
+    }
+    if (!userAgent || userAgent.length === 0) {
+        return new Response('userAgent is required', { status: 400 });
+    }
 
     // 构造参数
     const params = new URLSearchParams({
@@ -45,8 +61,9 @@ export async function fetchDouyinUserProfile(sec_uid: string, cookie: string, us
             throw new Error(`Douyin API fetch Error: ${response.status}`);
         }
 
-        const data = await response.json();
-        return new Response(JSON.stringify(data), { status: response.status, headers: response.headers });
+        // const data = await response.json();
+        // return new Response(JSON.stringify(data), { status: 200 });
+        return response;
 
     } catch (error) {
         console.error('Fetch Douyin Profile Error:', error);
