@@ -49,20 +49,20 @@ const DYLIVEINFO_ENDPOINT = 'https://api-forwarding-vc.vercel.app/api/dy/liveinf
 /**
  * Fetch liveinfos for given uids via GET (uids[] params)
  */
-export async function fetchDYLiveInfo(sec_user_id: string) {
-    if (!sec_user_id || sec_user_id.length === 0) return null;
-    // Use POST with JSON body to avoid excessively long URLs
-    const url = DYLIVEINFO_ENDPOINT;
-    const body = { "sec_user_id": sec_user_id };
-    const resp = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-    });
-    if (!resp.ok) throw new Error(`douyin upstream api fatal: ${resp.status}`);
-    const json = await resp.json();
-    return json;
-}
+// export async function fetchDYLiveInfo(sec_user_id: string) {
+//     if (!sec_user_id || sec_user_id.length === 0) return null;
+//     // Use POST with JSON body to avoid excessively long URLs
+//     const url = DYLIVEINFO_ENDPOINT;
+//     const body = { "sec_user_id": sec_user_id };
+//     const resp = await fetch(url, {
+//         method: 'POST',
+//         headers: { 'Content-Type': 'application/json' },
+//         body: JSON.stringify(body),
+//     });
+//     if (!resp.ok) throw new Error(`douyin upstream api fatal: ${resp.status}`);
+//     const json = await resp.json();
+//     return json;
+// }
 
 export async function getDYUserInfo(sec_uid: string, cookie: string, userAgent: string): Promise<DYUser | null> {
     // 检查参数
