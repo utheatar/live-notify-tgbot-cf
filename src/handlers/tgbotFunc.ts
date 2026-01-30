@@ -1,7 +1,7 @@
 import { sendMessage } from '../utils/telegram';
 import { KVStore } from '../storage/KVStore';
 import { fetchLiveInfosVC } from '../utils/bilibili';
-import { fetchDYLiveInfo, getDYUserInfo } from '../utils/douyin';
+import { getDYUserInfo } from '../utils/douyin';
 import {
     COMMAND_LIST_ALLUSER,
     COMMAND_ADD_BLUSER,
@@ -18,27 +18,42 @@ import { DYUser } from '../datamodel/DY';
 export async function handleTgWebhook(req: Request, env: Env) {
     if (req.method === 'OPTIONS') return new Response('Method OPTIONS OK', { status: 200 });
 
+    // parse request body
     let body: any;
     try {
         body = await req.json();
     } catch (e) {
-        return new Response('invalid json', { status: 400 });
+        return new Response('invalid json from request body', { status: 400 });
     }
 
+    // extract message
     const msg = body.message || body.edited_message || body.channel_post;
     if (!msg) return new Response('no message', { status: 200 });
-
+    // extract text and chat id
     const text: string = (msg.text || '').trim();
     const chatId = msg.chat && msg.chat.id;
-
+    // handle only text messages
     if (!text.startsWith('/')) {
-        // TODO: handle non-command messages if needed
-        return new Response('no command', { status: 200 });
+        // Optional: handle non-command messages if needed
+        return new Response('normal message', { status: 200 });
     }
-
+    // handle command: parse command
     const parts = text.split(/\s+/);
     const cmd = parts[0].slice(1).toLowerCase();
-
+    // prepare env vars
+    const dy_cookie = env.DY_COOKIE1;
+    const user_agent = env.USER_AGENT;
+    if (!dy_cookie || dy_cookie.length === 0) {
+        await sendMessage(env.BOT_TOKEN, chatId, 'DY_COOKIE1 is not configured.');
+        console.error('DY_COOKIE1 is not configured.');
+        return new Response('DY_COOKIE1 not configured', { status: 500 });
+    }
+    if (!user_agent || user_agent.length === 0) {
+        await sendMessage(env.BOT_TOKEN, chatId, 'USER_AGENT is not configured.');
+        console.error('USER_AGENT is not configured.');
+        return new Response('USER_AGENT not configured', { status: 500 });
+    }
+    // init KVStores and databases
     const BLStore = new KVStore(env.liveinfo, 'BL');
     const DYStore = new KVStore(env.liveinfo, 'DY');
 
@@ -58,7 +73,7 @@ export async function handleTgWebhook(req: Request, env: Env) {
                 uname = entry && entry.uname ? entry.uname : '';
             }
         } catch (e) {
-            console.log('fetch uname error', String(e));
+            console.error('fetch uname error', String(e));
         }
 
         const key = KEY_USERLIST;
@@ -142,7 +157,7 @@ export async function handleTgWebhook(req: Request, env: Env) {
         const sec = parts[1];
         let nickname = '';
         try {
-            const resp: any = await getDYUserInfo(sec, env.DY_COOKIE1, env.USER_AGENT);
+            const resp: any = await getDYUserInfo(sec, dy_cookie, user_agent);
             if (resp && resp.sec_uid && resp.nickname) {
                 const entry = resp;
                 nickname = entry.nickname ?? entry?.uname ?? entry?.unique_id ?? 'undefined';
@@ -151,7 +166,7 @@ export async function handleTgWebhook(req: Request, env: Env) {
                 throw new Error('Douyin user not found');
             }
         } catch (e) {
-            console.log('dy fetch nickname error', String(e));
+            console.error('dy fetch nickname error', String(e));
         }
 
         const key = KEY_USERLIST;
@@ -183,7 +198,7 @@ export async function handleTgWebhook(req: Request, env: Env) {
                 throw new Error('Douyin user not found');
             }
         } catch (e) {
-            console.log('dy fetch nickname error', String(e));
+            console.error('dy fetch nickname error', String(e));
         }
 
         const key = KEY_USERLIST;
@@ -219,7 +234,7 @@ export async function handleTgWebhook(req: Request, env: Env) {
                     nickname = 'undefined';
                 }
             } catch (e) {
-                console.log('dy fetch nickname error', String(e));
+                console.error('dy fetch nickname error', String(e));
             }
             const display = nickname ? `${sec}->${nickname}` : String(sec);
             await sendMessage(env.BOT_TOKEN, chatId, display);
