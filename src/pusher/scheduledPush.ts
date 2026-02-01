@@ -32,6 +32,7 @@ async function getBLInfos(kv: KVNamespace): Promise<string> {
     const cur = apiResp.data;
     // read previous statuses (mapping uid -> live_status) from KVStore
     let prev = (await BLStore.getJson<Record<string, number>>(KEY_LAST_INFO_STATUS)) || {};
+    // prepare messages
     let liveMessages: string[] = [];
     let loopMessages: string[] = [];
     let offlineMessages: string[] = [];
