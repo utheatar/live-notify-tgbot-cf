@@ -237,6 +237,10 @@ curl "http://localhost:8787/__scheduled?cron=*+*+*+*+*"
 
 修改 `wrangler.jsonc` 中的绑定后，运行：
 ```bash
+npx wrangler types
+```
+或
+```bash
 npm run cf-typegen
 ```
 
