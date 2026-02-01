@@ -38,7 +38,7 @@ export default {
 			if (pathname === '/tgbot/init') return handleInit(req, env);
 			if (pathname === '/tgbot/func') return handleTgWebhook(req, env);
 
-			// 默认显示测试页面
+			// 根路径：测试页面
 			if (pathname === '/' || pathname === '/index.html') {
 				return new Response(API_TEST_HTML, {
 					headers: { 'Content-Type': 'text/html;charset=utf-8' }
