@@ -34,30 +34,53 @@ export async function handleTgWebhook(req: Request, env: Env) {
     const chatId = msg.chat && msg.chat.id;
     // handle only text messages
     if (!text.startsWith('/')) {
-        // Optional: handle non-command messages if needed
-        return new Response('normal message', { status: 200 });
+        await handleTgNormalMessage();
+    } else {
+        await handleTgCommand(text, env);
     }
-    // handle command: parse command
-    const parts = text.split(/\s+/);
-    const cmd = parts[0].slice(1).toLowerCase();
+
+    return new Response('ok');
+}
+
+async function handleTgNormalMessage() {
+    // Optional: implement handling of normal (non-command) messages if needed
+}
+
+async function handleTgCommand(text: string, env: Env): Promise<Response> {
     // prepare env vars
+    const bot_token = env.BOT_TOKEN;
+    const chatId = env.CHAT_ID;
     const dy_cookie = env.DY_COOKIE1;
     const user_agent = env.USER_AGENT;
+    // check essential env vars
+    if (!bot_token || bot_token.length === 0) {
+        console.error('BOT_TOKEN is not configured.');
+        return new Response('BOT_TOKEN not configured', { status: 500 });
+    }
+    if (!chatId || chatId.length === 0) {
+        console.error('CHAT_ID is not configured.');
+        return new Response('CHAT_ID not configured', { status: 500 });
+    }
     if (!dy_cookie || dy_cookie.length === 0) {
-        await sendMessage(env.BOT_TOKEN, chatId, 'DY_COOKIE1 is not configured.');
         console.error('DY_COOKIE1 is not configured.');
         return new Response('DY_COOKIE1 not configured', { status: 500 });
     }
     if (!user_agent || user_agent.length === 0) {
-        await sendMessage(env.BOT_TOKEN, chatId, 'USER_AGENT is not configured.');
+        await sendMessage(bot_token, chatId, 'USER_AGENT is not configured.');
         console.error('USER_AGENT is not configured.');
         return new Response('USER_AGENT not configured', { status: 500 });
     }
+
     // init KVStores and databases
     const BLStore = new KVStore(env.liveinfo, 'BL');
     const DYStore = new KVStore(env.liveinfo, 'DY');
 
+    // handle command: parse command
+    const parts = text.split(/\s+/);
+    const cmd = parts[0].slice(1).toLowerCase();
+
     if (cmd === COMMAND_ADD_BLUSER) {
+        // check uid arg
         if (!parts[1] || parts[1].length === 0) {
             await sendMessage(env.BOT_TOKEN, chatId, 'Please provide a UID to add.');
             console.log('no uid provided.');
@@ -244,5 +267,5 @@ export async function handleTgWebhook(req: Request, env: Env) {
 
     // unknown command
     await sendMessage(env.BOT_TOKEN, chatId, `Unknown command: ${cmd}`);
-    return new Response('ok');
+    return new Response('unknown command', { status: 200 });
 }
