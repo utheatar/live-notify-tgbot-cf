@@ -91,6 +91,27 @@ async function getBLInfos(kv: KVNamespace): Promise<string> {
     return ordered.length ? ordered.join('\n\n') : '';
 }
 
+async function runTask_BL(kv: KVNamespace, env: Env): Promise<string> {
+    // init KVStore for BL
+    const BLStore: KVStore = new KVStore(kv, 'BL');
+    // init D1Store for database writes
+    const dbStore = new D1Store(env.streamers);
+    // read userlist from KVStore
+    const userlist = (await BLStore.getJson<number[] | string[]>(KEY_USERLIST)) || [];
+    if (!userlist || userlist.length === 0) {
+        console.log('getBLInfos: userlist empty');
+        return '';
+    }
+
+    // prepare messages
+    let liveMessages: string[] = [];
+    let loopMessages: string[] = [];
+    let offlineMessages: string[] = [];
+
+    const ordered = [...liveMessages, ...loopMessages, ...offlineMessages];
+    return ordered.length ? ordered.join('\n\n') : '';
+}
+
 async function getDYInfos(kv: KVNamespace, env: Env): Promise<string> {
     // init KVStore
     const DYStore: KVStore = new KVStore(kv, 'DY');
