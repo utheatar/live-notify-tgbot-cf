@@ -1,6 +1,6 @@
 import { sendMessage } from '../utils/telegram';
 import { KVStore } from '../storage/KVStore';
-import { fetchLiveInfosVC } from '../utils/bilibili';
+import { BLStreamerBaseItem, fetchLiveInfosVC } from '../utils/bilibili';
 import { getDYUserInfo } from '../utils/douyin';
 import {
     COMMAND_LIST_ALLUSER,
@@ -10,9 +10,13 @@ import {
     COMMAND_ADD_DYUSER,
     COMMAND_REMOVE_DYUSER,
     COMMAND_LIST_DYUSER,
+    COMMAND_BL_ADD_STREAMER,
+    COMMAND_BL_REMOVE_STREAMER,
+    COMMAND_BL_LIST_STREAMER
 } from '../constants/commands';
-import { KEY_USERLIST, KEY_LAST_INFO_STATUS } from '../storage/KVStore';
+import { KEY_UID_ROOMID, KEY_USERLIST } from '../constants/KVstoreKey';
 import { DYUser } from '../datamodel/DY';
+import { fetchLiveStatusByUids } from '../platforms/bilibili/liveStatusByUids';
 
 
 export async function handleTgWebhook(req: Request, env: Env) {
@@ -36,7 +40,7 @@ export async function handleTgWebhook(req: Request, env: Env) {
     if (!text.startsWith('/')) {
         await handleTgNormalMessage();
     } else {
-        await handleTgCommand(text, env);
+        await handleTgCommand(text, env, chatId);
     }
 
     return new Response('ok');
@@ -46,10 +50,9 @@ async function handleTgNormalMessage() {
     // Optional: implement handling of normal (non-command) messages if needed
 }
 
-async function handleTgCommand(text: string, env: Env): Promise<Response> {
+async function handleTgCommand(text: string, env: Env, chatId: number | string): Promise<Response> {
     // prepare env vars
     const bot_token = env.BOT_TOKEN;
-    const chatId = env.CHAT_ID;
     const dy_cookie = env.DY_COOKIE1;
     const user_agent = env.USER_AGENT;
     // check essential env vars
@@ -57,7 +60,7 @@ async function handleTgCommand(text: string, env: Env): Promise<Response> {
         console.error('BOT_TOKEN is not configured.');
         return new Response('BOT_TOKEN not configured', { status: 500 });
     }
-    if (!chatId || chatId.length === 0) {
+    if (!chatId || (typeof chatId === 'string' && chatId.length === 0)) {
         console.error('CHAT_ID is not configured.');
         return new Response('CHAT_ID not configured', { status: 500 });
     }
@@ -78,6 +81,7 @@ async function handleTgCommand(text: string, env: Env): Promise<Response> {
     // handle command: parse command
     const parts = text.split(/\s+/);
     const cmd = parts[0].slice(1).toLowerCase();
+    const args = parts[1] ? parts[1].split(',') : [];
 
     if (cmd === COMMAND_ADD_BLUSER) {
         // check uid arg
@@ -263,6 +267,195 @@ async function handleTgCommand(text: string, env: Env): Promise<Response> {
             await sendMessage(env.BOT_TOKEN, chatId, display);
         }
         return new Response('listed');
+    }
+
+    if (cmd === COMMAND_BL_ADD_STREAMER) {
+        // 1. 参数检查
+        if (args.length === 0 || args[0] === '') {
+            await sendMessage(env.BOT_TOKEN, chatId, '请提供要添加的 UID，例如: /bladd 12345 或 /bladd 123,456');
+            console.log('no uid provided.');
+            return new Response('no uid', { status: 200 });
+        }
+        // 过滤掉空的 uid 并去重
+        const inputUids = [...new Set(args.filter(u => u.trim().length > 0))];
+
+        // 计数器与名单
+        let addCount = 0;
+        let updateCount = 0;
+        const addedNames: string[] = [];
+        const updatedNames: string[] = [];
+        const failedUids: string[] = [];
+
+        try {
+            // 2. 调用 B站 API 获取直播间信息 (批量)
+            const liveStatusBatch = await fetchLiveStatusByUids(inputUids);
+
+            // 3. 读取 KV 中现有的列表
+            const key = KEY_UID_ROOMID;
+            const currentList = (await BLStore.getJson<BLStreamerBaseItem[]>(key)) || [];
+
+            let hasChange = false;
+
+            // 4. 遍历 API 返回的结果并处理 (新增或更新)
+            for (const uidStr of inputUids) {
+                const uidNum = Number(uidStr);
+                const info = liveStatusBatch[uidNum];
+
+                if (info) {
+                    // 查找 KV 中是否已存在该 UID
+                    const existingIndex = currentList.findIndex(item => item.uid === uidNum);
+
+                    if (existingIndex === -1) {
+                        // --- 情况 A: 不存在 -> 新增 ---
+                        currentList.push({
+                            uid: info.uid,
+                            roomid: info.room_id,
+                            name: info.uname
+                        });
+                        hasChange = true;
+                        addCount++;
+                        addedNames.push(`${info.uname}(${info.uid})`);
+                    } else {
+                        // --- 情况 B: 已存在 -> 更新 ---
+                        // 无论数据是否变化，都进行覆盖更新，确保名字和房间号是最新的
+                        currentList[existingIndex] = {
+                            uid: info.uid,
+                            roomid: info.room_id,
+                            name: info.uname
+                        };
+                        hasChange = true;
+                        updateCount++;
+                        updatedNames.push(`${info.uname}(${info.uid})`);
+                    }
+                } else {
+                    // API 没返回这个 UID 的信息，可能是无效 UID
+                    failedUids.push(`${uidStr}(无效)`);
+                }
+            }
+
+            // 5. 如果有变动 (新增或更新)，写入 KV
+            if (hasChange) {
+                await BLStore.setJson(key, currentList);
+            }
+
+            // 6. 发送反馈消息 (区分新增和更新)
+            let replyMsg = '';
+            if (addCount > 0) {
+                replyMsg += `✅ 新增 ${addCount} 人:\n${addedNames.join(', ')}\n`;
+            }
+            if (updateCount > 0) {
+                replyMsg += `🔄 更新 ${updateCount} 人:\n${updatedNames.join(', ')}\n`;
+            }
+            if (failedUids.length > 0) {
+                replyMsg += `⚠️ 失败 (无效UID):\n${failedUids.join(', ')}`;
+            }
+
+            if (!replyMsg) replyMsg = '未执行任何操作';
+
+            // 使用 HTML 模式发送以支持粗体 (取决于你的 sendMessage 实现是否支持 parse_mode)
+            await sendMessage(env.BOT_TOKEN, chatId, replyMsg);
+
+        } catch (e) {
+            console.error('Add/Update BLUser error:', e);
+            await sendMessage(env.BOT_TOKEN, chatId, `操作失败: 内部错误 - ${String(e)}`);
+        }
+
+        return new Response('command processed', { status: 200 });
+    }
+
+    if (cmd === COMMAND_BL_REMOVE_STREAMER) {
+        if (args.length === 0 || args[0] === '') {
+            await sendMessage(env.BOT_TOKEN, chatId, '请提供要删除的 UID，例如: /blrm 12345 或 /blrm 123,456');
+            return new Response('no uid', { status: 200 });
+        }
+
+        // 2. 转换并清洗 UID (去重、转数字)
+        const inputUidsStr = [...new Set(args.filter(u => u.trim().length > 0))];
+        const inputUids = inputUidsStr.map(u => Number(u)).filter(n => !isNaN(n));
+
+        if (inputUids.length === 0) {
+            await sendMessage(env.BOT_TOKEN, chatId, '提供的 UID 格式不正确');
+            return new Response('invalid uid', { status: 200 });
+        }
+
+        try {
+            const key = KEY_UID_ROOMID;
+            // 读取当前列表
+            const currentList = (await BLStore.getJson<BLStreamerBaseItem[]>(key)) || [];
+
+            // 准备删除逻辑
+            const uidsToRemoveSet = new Set(inputUids);
+            const newList: BLStreamerBaseItem[] = [];
+            const removedUidSet = new Set<number>(); // 用于记录实际成功删除的UID
+            const removedNames: string[] = [];
+
+            // 3. 遍历现有列表，保留不需要删除的
+            for (const item of currentList) {
+                if (uidsToRemoveSet.has(item.uid)) {
+                    // 命中删除
+                    removedUidSet.add(item.uid);
+                    removedNames.push(`${item.name}(${item.uid})`);
+                } else {
+                    // 保留
+                    newList.push(item);
+                }
+            }
+
+            // 计算未找到的 UID
+            const notFoundUids = inputUids.filter(uid => !removedUidSet.has(uid));
+
+            // 4. 如果有变动，写入 KV
+            if (removedUidSet.size > 0) {
+                await BLStore.setJson(key, newList);
+            }
+
+            // 5. 构建反馈消息
+            let replyMsg = '';
+            if (removedUidSet.size > 0) {
+                replyMsg += `🗑️ 已删除 ${removedUidSet.size} 人:\n${removedNames.join(', ')}\n`;
+            }
+            if (notFoundUids.length > 0) {
+                replyMsg += `⚠️ 未找到 (列表里没有):\n${notFoundUids.join(', ')}`;
+            }
+
+            if (!replyMsg) replyMsg = '未执行任何操作';
+
+            await sendMessage(env.BOT_TOKEN, chatId, replyMsg);
+
+        } catch (e) {
+            console.error('Remove BLUser error:', e);
+            await sendMessage(env.BOT_TOKEN, chatId, `删除失败: 内部错误 - ${String(e)}`);
+        }
+
+        return new Response('command processed', { status: 200 });
+    }
+
+    if (cmd === COMMAND_BL_LIST_STREAMER) {
+        const key = KEY_UID_ROOMID;
+        try {
+            // 读取 KV 列表
+            const list = (await BLStore.getJson<BLStreamerBaseItem[]>(key)) || [];
+
+            // 1. 判空处理
+            if (list.length === 0) {
+                await sendMessage(env.BOT_TOKEN, chatId, '📋 列表为空\n你可以使用 /bladd 添加主播');
+                return new Response('empty list', { status: 200 });
+            }
+
+            // 2. 格式化输出: name (uid)
+            // 这里我稍微加了一个标题头，让消息看起来更整洁
+            const lines = list.map(item => `${item.name} (${item.uid})`);
+            const message = `📋 已监控主播 (${list.length}):\n\n` + lines.join('\n');
+
+            // 3. 发送消息
+            await sendMessage(env.BOT_TOKEN, chatId, message);
+
+        } catch (e) {
+            console.error('List BLUser error:', e);
+            await sendMessage(env.BOT_TOKEN, chatId, `获取列表失败: 内部错误 - ${String(e)}`);
+        }
+
+        return new Response('list command processed', { status: 200 });
     }
 
     // unknown command

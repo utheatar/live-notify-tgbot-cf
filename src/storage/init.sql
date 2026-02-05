@@ -1,18 +1,28 @@
 DROP TABLE IF EXISTS BLUsers;
 CREATE TABLE IF NOT EXISTS BLUsers (
     ind INTEGER PRIMARY KEY AUTOINCREMENT,
-    record_time INTEGER NOT NULL,
-    uid INTEGER NOT NULL,
+    record_time INTEGER,
     name TEXT,
-    attention INTEGER,
-    roomid INTEGER,
-    live_title TEXT,
+    uid INTEGER,
+    room_id INTEGER,
     live_status INTEGER,
-    live_start_time INTEGER,
-    live_watchers INTEGER,
-    guard_num INTEGER,
-    guard_details TEXT
+    title TEXT,
+    live_time INTEGER,
+    attention INTEGER,
+    onlineNum INTEGER,
+    audience_rank TEXT, -- 存储 JSON
+    guardNum INTEGER,
+    guardDetail TEXT,   -- 存储 JSON
+    tags TEXT,
+    parent_area_id INTEGER,
+    parent_area_name TEXT,
+    area_id INTEGER,
+    area_name TEXT
 );
+
+-- 可选：创建索引加速查询
+CREATE INDEX IF NOT EXISTS idx_uid_time ON BLUsers (uid, record_time);
+
 DROP TABLE IF EXISTS DYUsers;
 CREATE TABLE IF NOT EXISTS DYUsers (
     ind INTEGER PRIMARY KEY AUTOINCREMENT,

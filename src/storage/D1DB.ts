@@ -1,5 +1,6 @@
 import { BLUSER } from "../datamodel/USER_BL";
 import { DYUser } from "../datamodel/DY";
+import { BLStreamerStatusInfo } from "../utils/bilibili";
 
 /**
  * 一个用于抽象 Cloudflare D1 数据库操作的类。
@@ -17,28 +18,51 @@ export class D1Store {
     }
     /**
      * 插入 BLUSER 记录。
-     * @param {BLUSER} bl_user - 要插入的 BLUSER 实例。
-     * @returns {Promise<void>} 操作完成的 Promise。
+     * @param info - 要插入的记录实例。
+     * @returns 操作完成的 Promise。
      */
-    async insertUserBL(bl_user: BLUSER): Promise<void> {
+    async insertStreamerStatus_BL(info: BLStreamerStatusInfo): Promise<void> {
+        const record_time = Math.floor(Date.now() / 1000);
+        // 序列化复杂字段
+        const audience_rank_str = info.audience_rank ? JSON.stringify(info.audience_rank) : '';
+        const guard_detail_str = info.guard_members ? JSON.stringify(info.guard_members) : '';
         const query = `
-            INSERT INTO BLUsers (record_time, uid, name, attention, roomid, live_title, live_status, live_start_time, live_watchers, guard_num, guard_details)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO BLUsers (
+                record_time, name, uid, room_id, live_status, title, live_time, 
+                attention, onlineNum, audience_rank, guardNum, guardDetail, 
+                tags, parent_area_id, parent_area_name, area_id, area_name
+            ) VALUES (
+                ?, ?, ?, ?, ?, ?, ?, 
+                ?, ?, ?, ?, ?, 
+                ?, ?, ?, ?, ?
+            )
         `;
-        const params = [
-            bl_user.record_time,
-            bl_user.uid,
-            bl_user.name,
-            bl_user.attention,
-            bl_user.roomid,
-            bl_user.live_title,
-            bl_user.live_status,
-            bl_user.live_start_time,
-            bl_user.live_watchers,
-            bl_user.guard_num,
-            bl_user.guard_details
-        ];
-        await this.db.prepare(query).bind(...params).run();
+        try {
+            await this.db.prepare(query)
+                .bind(
+                    record_time,
+                    info.name,
+                    info.uid,
+                    info.room_id,
+                    info.live_status,
+                    info.title,
+                    info.live_time,
+                    info.attention,
+                    info.online_num || 0,
+                    audience_rank_str,
+                    info.guard_count || 0,
+                    guard_detail_str,
+                    info.tags,
+                    info.parent_area_id,
+                    info.parent_area_name,
+                    info.area_id,
+                    info.area_name
+                )
+                .run();
+        } catch (error) {
+            console.error('Error inserting BLUSER record:', error);
+            throw error;
+        }
     }
 
     /**

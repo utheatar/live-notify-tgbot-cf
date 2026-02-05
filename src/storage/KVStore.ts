@@ -94,6 +94,3 @@ export class KVStore {
     }
 }
 
-// KV Store keys
-export const KEY_USERLIST = 'userlist';
-export const KEY_LAST_INFO_STATUS = 'last_info_status';
