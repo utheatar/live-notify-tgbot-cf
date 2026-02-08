@@ -1,12 +1,9 @@
 import { sendMessage } from '../utils/telegram';
 import { KVStore } from '../storage/KVStore';
-import { BLStreamerBaseItem, fetchLiveInfosVC } from '../utils/bilibili';
+import { BLStreamerBaseItem } from '../utils/bilibili';
 import { getDYUserInfo } from '../utils/douyin';
 import {
     COMMAND_LIST_ALLUSER,
-    COMMAND_ADD_BLUSER,
-    COMMAND_REMOVE_BLUSER,
-    COMMAND_LIST_BLUSER,
     COMMAND_ADD_DYUSER,
     COMMAND_REMOVE_DYUSER,
     COMMAND_LIST_DYUSER,
@@ -83,97 +80,11 @@ async function handleTgCommand(text: string, env: Env, chatId: number | string):
     const cmd = parts[0].slice(1).toLowerCase();
     const args = parts[1] ? parts[1].split(',') : [];
 
-    if (cmd === COMMAND_ADD_BLUSER) {
-        // check uid arg
-        if (!parts[1] || parts[1].length === 0) {
-            await sendMessage(env.BOT_TOKEN, chatId, 'Please provide a UID to add.');
-            console.log('no uid provided.');
-            return new Response('no uid', { status: 200 });
-        }
-        const uid = parts[1];
-        // try to get uname for better feedback
-        let uname = '';
-        try {
-            const infoResp: any = await fetchLiveInfosVC([uid]);
-            if (infoResp && infoResp.apisuccess && infoResp.data) {
-                const entry = infoResp.data[String(uid)] || infoResp.data[Number(uid)];
-                uname = entry && entry.uname ? entry.uname : '';
-            }
-        } catch (e) {
-            console.error('fetch uname error', String(e));
-        }
+    // if (cmd === COMMAND_ADD_BLUSER) { ... } logic removed
 
-        const key = KEY_USERLIST;
-        const raw = (await BLStore.getJson<string[]>(key)) || [];
-        const list = Array.isArray(raw) ? raw : [];
-        if (!list.includes(uid)) {
-            list.push(uid);
-            await BLStore.setJson(key, list);
-        }
-        const display = uname ? `${uid}->${uname}` : String(uid);
-        await sendMessage(env.BOT_TOKEN, chatId, `Added ${display}`);
-        return new Response('added');
-    }
+    // if (cmd === COMMAND_REMOVE_BLUSER) { ... } logic removed
 
-    if (cmd === COMMAND_REMOVE_BLUSER) {
-        if (!parts[1] || parts[1].length === 0) {
-            await sendMessage(env.BOT_TOKEN, chatId, 'Please provide a UID to remove.');
-            return new Response('no uid', { status: 200 });
-        }
-        const uid = parts[1];
-        // try to fetch uname
-        let uname = '';
-        try {
-            const infoResp: any = await fetchLiveInfosVC([uid]);
-            if (infoResp && infoResp.apisuccess && infoResp.data) {
-                const entry = infoResp.data[String(uid)] || infoResp.data[Number(uid)];
-                uname = entry && entry.uname ? entry.uname : '';
-            }
-        } catch (e) {
-            console.log('fetch uname error', String(e));
-        }
-
-        const key = KEY_USERLIST;
-        const raw = (await BLStore.getJson<string[]>(key)) || [];
-        const list = Array.isArray(raw) ? raw : [];
-        const idx = list.indexOf(uid);
-        if (idx !== -1) {
-            list.splice(idx, 1);
-            await BLStore.setJson(key, list);
-        }
-        const display = uname ? `${uid}->${uname}` : String(uid);
-        await sendMessage(env.BOT_TOKEN, chatId, `Removed ${display}`);
-        return new Response('removed');
-    }
-
-    if (cmd === COMMAND_LIST_BLUSER) {
-        const key = KEY_USERLIST;
-        const raw = (await BLStore.getJson<string[]>(key)) || [];
-        const list = Array.isArray(raw) ? raw : [];
-        if (!list || list.length === 0) {
-            await sendMessage(env.BOT_TOKEN, chatId, '(empty)');
-            return new Response('listed');
-        }
-
-        // fetch names in batch
-        let infoResp: any = null;
-        try {
-            infoResp = await fetchLiveInfosVC(list);
-        } catch (e) {
-            console.log('fetch list unames error', String(e));
-        }
-
-        for (const uid of list) {
-            let uname = '';
-            if (infoResp && infoResp.apisuccess && infoResp.data) {
-                const entry = infoResp.data[String(uid)] || infoResp.data[Number(uid)];
-                uname = entry && entry.uname ? entry.uname : '';
-            }
-            const display = uname ? `${uid}->${uname}` : String(uid);
-            await sendMessage(env.BOT_TOKEN, chatId, display);
-        }
-        return new Response('listed');
-    }
+    // if (cmd === COMMAND_LIST_BLUSER) { ... } logic removed
 
     // DY commands (Douyin)
     if (cmd === COMMAND_ADD_DYUSER) {
@@ -352,7 +263,6 @@ async function handleTgCommand(text: string, env: Env, chatId: number | string):
 
             if (!replyMsg) replyMsg = '未执行任何操作';
 
-            // 使用 HTML 模式发送以支持粗体 (取决于你的 sendMessage 实现是否支持 parse_mode)
             await sendMessage(env.BOT_TOKEN, chatId, replyMsg);
 
         } catch (e) {
@@ -443,7 +353,7 @@ async function handleTgCommand(text: string, env: Env, chatId: number | string):
             }
 
             // 2. 格式化输出: name (uid)
-            // 这里我稍微加了一个标题头，让消息看起来更整洁
+            // 这里我加了一个标题头，让消息看起来更整洁
             const lines = list.map(item => `${item.name} (${item.uid})`);
             const message = `📋 已监控主播 (${list.length}):\n\n` + lines.join('\n');
 

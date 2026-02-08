@@ -28,7 +28,8 @@ export class BLUSER {
         live_start_time: number,
         live_watchers: number,
         guard_num: number,
-        guard_details: string) {
+        guard_details: string
+    ) {
         this.record_time = record_time;
         this.uid = uid;
         this.name = name;
