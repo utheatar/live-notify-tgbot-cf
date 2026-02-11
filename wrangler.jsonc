@@ -4,7 +4,7 @@
  */
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "tgbot-pusher2",
+	"name": "live_notify_tgbot_cf",
 	"main": "src/index.ts",
 	"compatibility_date": "2025-12-02",
 	// to enable nodejs compatibility features, e.g. globalThis, crypto, etc.
@@ -27,16 +27,15 @@
 	 */
 	"kv_namespaces": [
 		{
-			"binding": "liveinfo",
-			"id": "60cfa595e745448e906809d8042a9647",
-			"preview_id": "df1d6d27e6534d3ea71b0966ca10f07a"
+			"binding": "live_notify_tgbot",
+			"id": "fd32f73661494c92b0531c9b0fec4fe9"
 		}
 	],
 	"d1_databases": [
 		{
-			"binding": "streamers",
-			"database_name": "streamers",
-			"database_id": "0dbc9c9b-cff4-47c7-b6cb-b13b16da84d4"
+			"binding": "live_notify",
+			"database_name": "live_notify",
+			"database_id": "42581890-ac54-44ef-9f74-5caa9bd50a5e"
 		}
 	],
 	/**
@@ -64,5 +63,5 @@
 		"crons": [
 			"*/1 * * * *"
 		]
-	}
+	},
 }

@@ -1,6 +1,5 @@
-import { BLUSER } from "../datamodel/USER_BL";
-import { DYUser } from "../datamodel/DY";
-import { BLStreamerStatusInfo } from "../utils/bilibili";
+import { DYUser, DYUSERRECORD } from "./DY";
+import { BLStreamerStatusInfo } from "../platforms/bilibili/aggregation";
 
 /**
  * 一个用于抽象 Cloudflare D1 数据库操作的类。
@@ -65,16 +64,6 @@ export class D1Store {
         }
     }
 
-    /**
-     * 获取指定 UID 的 BLUSER 记录。
-     * @param {number | string} uid - 要查询的用户 UID。
-     * @returns {Promise<BLUSER | null>} 查询结果的 Promise，如果未找到则返回 null。
-     */
-    async getUserBL(uid: number | string): Promise<BLUSER | null> {
-        const query = `SELECT * FROM BLUsers WHERE uid = ?;`;
-        const result = await this.db.prepare(query).bind(uid).first<BLUSER>();
-        return result || null;
-    }
 
     /**
      * 插入 DYUser 记录。

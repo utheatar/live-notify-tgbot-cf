@@ -1,7 +1,7 @@
-import { sendMessage } from '../utils/telegram';
-import { KVStore } from '../storage/KVStore';
-import { BLStreamerBaseItem } from '../utils/bilibili';
-import { getDYUserInfo } from '../utils/douyin';
+import { TelegramBot } from '../../platforms/telegram/bot';
+import { KVStore } from '../../storage/KVStore';
+import { BLStreamerBaseItem } from '../../platforms/bilibili/aggregation';
+import { getDYUserInfo } from '../../platforms/douyin/api';
 import {
     COMMAND_LIST_ALLUSER,
     COMMAND_ADD_DYUSER,
@@ -10,10 +10,10 @@ import {
     COMMAND_BL_ADD_STREAMER,
     COMMAND_BL_REMOVE_STREAMER,
     COMMAND_BL_LIST_STREAMER
-} from '../constants/commands';
-import { KEY_UID_ROOMID, KEY_USERLIST } from '../constants/KVstoreKey';
-import { DYUser } from '../datamodel/DY';
-import { fetchLiveStatusByUids } from '../platforms/bilibili/liveStatusByUids';
+} from './commands';
+import { KEY_UID_ROOMID, KEY_USERLIST } from '../../constants/KVstoreKey';
+import { DYUser } from '../../storage/DY';
+import { fetchLiveStatusByUids } from '../../platforms/bilibili/liveStatusByUids';
 
 
 export async function handleTgWebhook(req: Request, env: Env) {
@@ -34,10 +34,20 @@ export async function handleTgWebhook(req: Request, env: Env) {
     const text: string = (msg.text || '').trim();
     const chatId = msg.chat && msg.chat.id;
     // handle only text messages
-    if (!text.startsWith('/')) {
-        await handleTgNormalMessage();
-    } else {
-        await handleTgCommand(text, env, chatId);
+    try {
+        if (!text.startsWith('/')) {
+            await handleTgNormalMessage();
+        } else {
+            await handleTgCommand(text, env, chatId);
+        }
+    } catch (e) {
+        console.error('handleTgWebhook error:', e);
+        try {
+            const bot = new TelegramBot(env.BOT_TOKEN);
+            await bot.sendMessage(chatId, `❌ Internal Error: ${String(e)}`);
+        } catch (sendErr) {
+            console.error('Failed to send error report:', sendErr);
+        }
     }
 
     return new Response('ok');
@@ -52,6 +62,9 @@ async function handleTgCommand(text: string, env: Env, chatId: number | string):
     const bot_token = env.BOT_TOKEN;
     const dy_cookie = env.DY_COOKIE1;
     const user_agent = env.USER_AGENT;
+
+    const bot = new TelegramBot(bot_token);
+
     // check essential env vars
     if (!bot_token || bot_token.length === 0) {
         console.error('BOT_TOKEN is not configured.');
@@ -62,34 +75,29 @@ async function handleTgCommand(text: string, env: Env, chatId: number | string):
         return new Response('CHAT_ID not configured', { status: 500 });
     }
     if (!dy_cookie || dy_cookie.length === 0) {
+        await bot.sendMessage(chatId, 'DY_COOKIE1 is not configured.');
         console.error('DY_COOKIE1 is not configured.');
         return new Response('DY_COOKIE1 not configured', { status: 500 });
     }
     if (!user_agent || user_agent.length === 0) {
-        await sendMessage(bot_token, chatId, 'USER_AGENT is not configured.');
+        await bot.sendMessage(chatId, 'USER_AGENT is not configured.');
         console.error('USER_AGENT is not configured.');
         return new Response('USER_AGENT not configured', { status: 500 });
     }
 
     // init KVStores and databases
-    const BLStore = new KVStore(env.liveinfo, 'BL');
-    const DYStore = new KVStore(env.liveinfo, 'DY');
+    const BLStore = new KVStore(env.live_notify_tgbot, 'BL');
+    const DYStore = new KVStore(env.live_notify_tgbot, 'DY');
 
     // handle command: parse command
     const parts = text.split(/\s+/);
     const cmd = parts[0].slice(1).toLowerCase();
     const args = parts[1] ? parts[1].split(',') : [];
 
-    // if (cmd === COMMAND_ADD_BLUSER) { ... } logic removed
-
-    // if (cmd === COMMAND_REMOVE_BLUSER) { ... } logic removed
-
-    // if (cmd === COMMAND_LIST_BLUSER) { ... } logic removed
-
     // DY commands (Douyin)
     if (cmd === COMMAND_ADD_DYUSER) {
         if (!parts[1] || parts[1].length === 0) {
-            await sendMessage(env.BOT_TOKEN, chatId, 'Please provide a sec_user_id to add.');
+            await bot.sendMessage(chatId, 'Please provide a sec_user_id to add.');
             return new Response('no uid', { status: 200 });
         }
         const sec = parts[1];
@@ -100,7 +108,7 @@ async function handleTgCommand(text: string, env: Env, chatId: number | string):
                 const entry = resp;
                 nickname = entry.nickname ?? entry?.uname ?? entry?.unique_id ?? 'undefined';
             } else {
-                await sendMessage(env.BOT_TOKEN, chatId, 'Douyin user not found.');
+                await bot.sendMessage(chatId, 'Douyin user not found.');
                 throw new Error('Douyin user not found');
             }
         } catch (e) {
@@ -115,13 +123,13 @@ async function handleTgCommand(text: string, env: Env, chatId: number | string):
             await DYStore.setJson(key, list2);
         }
         const display = nickname ? `${sec}->${nickname}` : String(sec);
-        await sendMessage(env.BOT_TOKEN, chatId, `Added ${display}`);
+        await bot.sendMessage(chatId, `Added ${display}`);
         return new Response('added');
     }
 
     if (cmd === COMMAND_REMOVE_DYUSER) {
         if (!parts[1] || parts[1].length === 0) {
-            await sendMessage(env.BOT_TOKEN, chatId, 'Please provide a sec_user_id to remove.');
+            await bot.sendMessage(chatId, 'Please provide a sec_user_id to remove.');
             return new Response('no uid', { status: 200 });
         }
         const sec = parts[1];
@@ -132,7 +140,7 @@ async function handleTgCommand(text: string, env: Env, chatId: number | string):
                 const entry = resp;
                 nickname = entry.nickname ?? entry?.uname ?? entry?.unique_id ?? '';
             } else {
-                await sendMessage(env.BOT_TOKEN, chatId, 'Douyin user not found.');
+                await bot.sendMessage(chatId, 'Douyin user not found.');
                 throw new Error('Douyin user not found');
             }
         } catch (e) {
@@ -148,7 +156,7 @@ async function handleTgCommand(text: string, env: Env, chatId: number | string):
             await DYStore.setJson(key, list2);
         }
         const display = nickname ? `${sec}->${nickname}` : String(sec);
-        await sendMessage(env.BOT_TOKEN, chatId, `Removed ${display}`);
+        await bot.sendMessage(chatId, `Removed ${display}`);
         return new Response('removed');
     }
 
@@ -157,7 +165,7 @@ async function handleTgCommand(text: string, env: Env, chatId: number | string):
         const raw = (await DYStore.getJson<string[]>(key)) || [];
         const list2 = Array.isArray(raw) ? raw : [];
         if (!list2 || list2.length === 0) {
-            await sendMessage(env.BOT_TOKEN, chatId, '(empty)');
+            await bot.sendMessage(chatId, '(empty)');
             return new Response('listed');
         }
 
@@ -175,7 +183,7 @@ async function handleTgCommand(text: string, env: Env, chatId: number | string):
                 console.error('dy fetch nickname error', String(e));
             }
             const display = nickname ? `${sec}->${nickname}` : String(sec);
-            await sendMessage(env.BOT_TOKEN, chatId, display);
+            await bot.sendMessage(chatId, display);
         }
         return new Response('listed');
     }
@@ -183,7 +191,7 @@ async function handleTgCommand(text: string, env: Env, chatId: number | string):
     if (cmd === COMMAND_BL_ADD_STREAMER) {
         // 1. 参数检查
         if (args.length === 0 || args[0] === '') {
-            await sendMessage(env.BOT_TOKEN, chatId, '请提供要添加的 UID，例如: /bladd 12345 或 /bladd 123,456');
+            await bot.sendMessage(chatId, '请提供要添加的 UID，例如: /bladd 12345 或 /bladd 123,456');
             console.log('no uid provided.');
             return new Response('no uid', { status: 200 });
         }
@@ -263,11 +271,11 @@ async function handleTgCommand(text: string, env: Env, chatId: number | string):
 
             if (!replyMsg) replyMsg = '未执行任何操作';
 
-            await sendMessage(env.BOT_TOKEN, chatId, replyMsg);
+            await bot.sendMessage(chatId, replyMsg);
 
         } catch (e) {
             console.error('Add/Update BLUser error:', e);
-            await sendMessage(env.BOT_TOKEN, chatId, `操作失败: 内部错误 - ${String(e)}`);
+            await bot.sendMessage(chatId, `操作失败: 内部错误 - ${String(e)}`);
         }
 
         return new Response('command processed', { status: 200 });
@@ -275,7 +283,7 @@ async function handleTgCommand(text: string, env: Env, chatId: number | string):
 
     if (cmd === COMMAND_BL_REMOVE_STREAMER) {
         if (args.length === 0 || args[0] === '') {
-            await sendMessage(env.BOT_TOKEN, chatId, '请提供要删除的 UID，例如: /blrm 12345 或 /blrm 123,456');
+            await bot.sendMessage(chatId, '请提供要删除的 UID，例如: /blrm 12345 或 /blrm 123,456');
             return new Response('no uid', { status: 200 });
         }
 
@@ -284,7 +292,7 @@ async function handleTgCommand(text: string, env: Env, chatId: number | string):
         const inputUids = inputUidsStr.map(u => Number(u)).filter(n => !isNaN(n));
 
         if (inputUids.length === 0) {
-            await sendMessage(env.BOT_TOKEN, chatId, '提供的 UID 格式不正确');
+            await bot.sendMessage(chatId, '提供的 UID 格式不正确');
             return new Response('invalid uid', { status: 200 });
         }
 
@@ -330,11 +338,11 @@ async function handleTgCommand(text: string, env: Env, chatId: number | string):
 
             if (!replyMsg) replyMsg = '未执行任何操作';
 
-            await sendMessage(env.BOT_TOKEN, chatId, replyMsg);
+            await bot.sendMessage(chatId, replyMsg);
 
         } catch (e) {
             console.error('Remove BLUser error:', e);
-            await sendMessage(env.BOT_TOKEN, chatId, `删除失败: 内部错误 - ${String(e)}`);
+            await bot.sendMessage(chatId, `删除失败: 内部错误 - ${String(e)}`);
         }
 
         return new Response('command processed', { status: 200 });
@@ -348,7 +356,7 @@ async function handleTgCommand(text: string, env: Env, chatId: number | string):
 
             // 1. 判空处理
             if (list.length === 0) {
-                await sendMessage(env.BOT_TOKEN, chatId, '📋 列表为空\n你可以使用 /bladd 添加主播');
+                await bot.sendMessage(chatId, '📋 列表为空\n你可以使用 /bladd 添加主播');
                 return new Response('empty list', { status: 200 });
             }
 
@@ -358,17 +366,31 @@ async function handleTgCommand(text: string, env: Env, chatId: number | string):
             const message = `📋 已监控主播 (${list.length}):\n\n` + lines.join('\n');
 
             // 3. 发送消息
-            await sendMessage(env.BOT_TOKEN, chatId, message);
+            await bot.sendMessage(chatId, message);
 
         } catch (e) {
             console.error('List BLUser error:', e);
-            await sendMessage(env.BOT_TOKEN, chatId, `获取列表失败: 内部错误 - ${String(e)}`);
+            await bot.sendMessage(chatId, `获取列表失败: 内部错误 - ${String(e)}`);
         }
 
         return new Response('list command processed', { status: 200 });
     }
 
+    if (cmd === 'start' || cmd === 'help') {
+        const helpMsg = `Available commands:
+/bladd <uid> - Add Bilibili streamer
+/blrm <uid> - Remove Bilibili streamer
+/blls - List Bilibili streamers
+/adddy <sec_uid> - Add Douyin user
+/rmdy <sec_uid> - Remove Douyin user
+/lsdy - List Douyin users
+/lsall - List all
+`;
+        await bot.sendMessage(chatId, helpMsg);
+        return new Response('help sent', { status: 200 });
+    }
+
     // unknown command
-    await sendMessage(env.BOT_TOKEN, chatId, `Unknown command: ${cmd}`);
+    await bot.sendMessage(chatId, `Unknown command: ${cmd}`);
     return new Response('unknown command', { status: 200 });
 }

@@ -1,14 +1,15 @@
-// Command constants
-export const COMMAND_LIST_ALLUSER = 'lsall';
-
+/* Command constants */
+// douyin about
 export const COMMAND_ADD_DYUSER = 'adddy';
 export const COMMAND_REMOVE_DYUSER = 'rmdy';
 export const COMMAND_LIST_DYUSER = 'lsdy';
-
-// new bilibili command 
+// bilibili about
 export const COMMAND_BL_ADD_STREAMER = 'bladd';
 export const COMMAND_BL_REMOVE_STREAMER = 'blrm';
 export const COMMAND_BL_LIST_STREAMER = 'blls';
+// other
+export const COMMAND_LIST_ALLUSER = 'lsall';
+
 // Export a unified commands list for Telegram's setMyCommands
 export const COMMANDS = [
     { command: COMMAND_BL_ADD_STREAMER, description: 'Add a Bilibili streamer: /bladd <uid>[,<uid>,...]' },

@@ -1,4 +1,4 @@
-# tgbot-pusher2
+# live-notify-tgbot-cf
 
 基于 Cloudflare Worker 的 Telegram 机器人，用于监控 Bilibili 和抖音（Douyin）主播的直播状态，当检测到状态变化时推送通知到指定 Telegram 群组。
 
@@ -46,7 +46,7 @@ src/
 
 ### 存储架构
 
-#### KV 命名空间 (`liveinfo`)
+#### KV 命名空间
 
 使用单一 KV 命名空间，通过前缀隔离不同平台的数据：
 
@@ -57,7 +57,7 @@ src/
 | `DY_userlist` | 抖音用户 sec_uid 列表 |
 | `DY_last_info_status` | 抖音用户上次直播状态映射 `{sec_uid: live_status}` |
 
-#### D1 数据库 (`streamers`)
+#### D1 数据库
 
 **BLUsers 表** - Bilibili 用户记录
 ```sql
@@ -180,26 +180,43 @@ DY_COOKIE1=your_cookie
 
 ### 前置准备
 
-1. 安装 Node.js 依赖
+1. 注册Cloudflare账号，
+
+2. 将代码克隆到本地并安装 Node.js 依赖
+
 ```bash
 npm install
 ```
 
-2. 登录 Cloudflare
+3. 登录 Cloudflare
 ```bash
 npx wrangler login
 ```
 
-3. 创建 KV 命名空间和 D1 数据库（在 Cloudflare 控制台操作）
+4. 创建 KV 命名空间和 D1 数据库。
 
-4. 更新 `wrangler.jsonc` 中的 `kv_namespaces` 和 `d1_databases` 配置
+这里都用 live_notify 作为命名空间和数据库名，实际上可以自定义。但如果使用自定义的名称，需要同步修改 `wrangler.jsonc` 中的 `kv_namespaces` 和 `d1_databases` 配置，填入你的KV和d1的相关信息。代码里也需要有对应的修改。尤其是`src/storage/`下的文件。
 
-5. 初始化 D1 数据库表结构
+```bash
+# create KV
+npx wrangler kv namespace create live_notify
+# create d1
+npx wrangler d1 create live_notify
+```
+
+你也可以使用 dashboard 来创建 KV 和 D1 数据库。然后手动把id填入`wrangler.jsonc`中的`kv_namespaces`和`d1_databases`配置里。注意，KV和D1的id需要和`wrangler.jsonc`中的配置一致。
+
+5. 创建 Telegram Bot，获取bot token；获取要发送推送信息的 Chat ID。
+
+向 bot father 发送 /newbot 命令，按照提示创建 bot，获取 token。chat id是指bot要向哪个聊天发送信息，可以是个人聊天，也可以是群聊或频道，具体获取方式请自行搜索。
+
+6. 初始化 D1 数据库表结构。
+
 ```bash
 npx wrangler d1 execute streamers --file=src/storage/init.sql
 ```
 
-6. 设置环境变量（见上文配置）
+7. 运行 `npx wrangler types`，生成类型定义文件。这步不是必须的，但是可以提供类型检查。
 
 ### 部署到生产环境
 
@@ -211,7 +228,7 @@ npm run deploy
 
 部署完成后，访问以下 URL 初始化 Webhook：
 ```
-https://your-worker-url.tgbot/init
+https://your-worker-url/tgbot/init
 ```
 
 ## 本地开发
@@ -248,8 +265,7 @@ npm run cf-typegen
 
 - 抖音 API 需要签名，签名算法在 `src/platforms/douyin/sign.ts` 中实现
 - `KVStore` 类提供类型安全的 KV 访问，建议始终使用此封装而非直接访问 KV
-- 状态变化时才会写入数据库，避免冗余记录
-- `DY_COOKIE` 可能会过期，需要定期更新
+- 任何 cookie 都有可能过期，需要定期更新
 
 ## 相关文件说明
 

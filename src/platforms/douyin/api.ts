@@ -1,7 +1,13 @@
-import { DYUser } from "../datamodel/DY";
-import { fetchDouyinUserProfile, DouyinUserProfileResponse } from "../platforms/douyin/userprofile";
+import { DYUser } from "../../storage/DY";
+import { fetchDouyinUserProfile, DouyinUserProfileResponse } from "./userprofile";
 
-
+/**
+ * 获取抖音用户信息
+ * @param sec_uid 抖音用户 sec_uid
+ * @param cookie 抖音用户 cookie
+ * @param userAgent 浏览器 userAgent
+ * @returns 抖音用户信息
+ */
 export async function getDYUserInfo(sec_uid: string, cookie: string, userAgent: string): Promise<DYUser | null> {
     // 检查参数
     if (!sec_uid || sec_uid.length === 0) {

@@ -1,49 +1,7 @@
-import { GuardInfo, GuardInfoItem, fetchGuardInfo } from "../platforms/bilibili/guardInfo";
-import { RoomAudienceRank, fetchRoomAudienceRank, AudienceRankItem } from "../platforms/bilibili/roomAudienceRank";
-import { RoomBaseInfo, fetchRoomInfosByRoomids } from "../platforms/bilibili/roomInfoByRoomids";
+import { GuardInfo, GuardInfoItem, fetchGuardInfo } from "./guardInfo";
+import { RoomAudienceRank, fetchRoomAudienceRank, AudienceRankItem } from "./roomAudienceRank";
+import { RoomBaseInfo, fetchRoomInfosByRoomids } from "./roomInfoByRoomids";
 
-const URL_LIVE_INFOS_BY_UIDS = 'https://api.live.bilibili.com/room/v1/Room/get_status_info_by_uids';
-
-// 单个用户信息的类型
-type UserInfo = {
-    title: string;
-    room_id: number;
-    uid: number;
-    live_time: number;
-    live_status: number;
-    uname: string;
-};
-
-// data 字段的类型：以 uid 为键，UserInfo 为值的对象
-type UserDataMap = Record<string, UserInfo>;
-
-// 完整的 API 响应类型
-type LiveInfoResponse = {
-    code: number;
-    msg: string;
-    message: string;
-    data: UserDataMap;
-};
-
-
-/**
- * Fetch liveinfos by uids via POST
- * @param uids Array of user IDs
- * @returns LiveInfoResponse object
- */
-export async function fetchLiveInfosByUIDs(uids: string[] | number[]): Promise<LiveInfoResponse> {
-    if (!uids || uids.length === 0) throw new Error('uids array is empty');
-    const url = URL_LIVE_INFOS_BY_UIDS;
-    const body = { uids: uids.map((u) => Number(u)) };
-    const resp = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-    });
-    if (!resp.ok) throw new Error(`liveinfos fetch failed: ${resp.status}`);
-    const json = await resp.json();
-    return json as LiveInfoResponse;
-}
 
 // KV 中 B站 uid_roomid 项
 export interface BLStreamerBaseItem {
@@ -79,7 +37,7 @@ export interface BLStreamerStatusInfo {
     area_name: string;
     // 动态数据，仅直播时有效
     live_time: number;        // 开播时间戳 (秒)
-    // 进阶数据 (仅直播时去获取，否则为空)
+    // 进阶数据 (实际调用时为减少请求量，编写为仅直播时去获取)
     guard_count?: number;    // 舰长总数
     guard_members?: GuardInfoItem[];           // 舰长列表信息
     online_num?: number;     // 实时在线人数
