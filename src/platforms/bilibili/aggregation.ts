@@ -13,8 +13,8 @@ export interface BLStreamerBaseItem {
 // KV 中 B站 监测主播项
 export interface BLStreamerItem extends BLStreamerBaseItem {
     live_status: number;    // 0: not live, 1: live
+    title: string;
     attention: number;
-    onlineNum: number;
     guardNum: number;
 }
 
