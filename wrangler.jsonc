@@ -4,7 +4,7 @@
  */
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "live_notify_tgbot_cf",
+	"name": "live-notify-tgbot-cf",
 	"main": "src/index.ts",
 	"compatibility_date": "2025-12-02",
 	// to enable nodejs compatibility features, e.g. globalThis, crypto, etc.
