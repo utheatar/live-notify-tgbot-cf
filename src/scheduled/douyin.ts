@@ -76,22 +76,22 @@ export async function runTask_DY(env: Env): Promise<string> {
             console.log('runTask_DY: failed to write to database', String(e));
         }
         // format message to send
-        const statusTexts: Record<number, string> = {
-            0: '已下播',
-            1: '*正在直播！*',
-            2: '轮播中',
-        };
-        const statusText = statusTexts[Number(live_status)] || `status: ${live_status}`;
-        const header = `${cur.nickname || ''} - ${statusText}`;
-        const signature = cur.signature || '';
-        const iplocation = cur.ip_location || '';
-        const parts = [header];
-        if (signature) parts.push(`> ${signature}`);
-        if (iplocation && live_status === 1) parts.push(iplocation);
-        const formatted = parts.join('\n');
-        if (live_status === 1) liveMessages.push(formatted);
-        else if (live_status === 2) loopMessages.push(formatted);
-        else offlineMessages.push(formatted);
+        const nickname = cur.nickname || '';
+        if (live_status === 0) {
+            // 下播：简洁格式，与 Bilibili 保持一致
+            offlineMessages.push(`${nickname} - 已下播`);
+        } else if (live_status === 1) {
+            // 直播中：包含详细信息
+            const parts = [`${nickname} - *正在直播！*`];
+            if (cur.signature) parts.push(`> ${cur.signature}`);
+            if (cur.ip_location) parts.push(cur.ip_location);
+            liveMessages.push(parts.join('\n'));
+        } else if (live_status === 2) {
+            // 轮播
+            loopMessages.push(`${nickname} - 轮播中`);
+        } else {
+            loopMessages.push(`${nickname} - status: ${live_status}`);
+        }
     }
 
     // persist latest DY statuses
