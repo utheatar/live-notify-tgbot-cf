@@ -15,7 +15,7 @@ from datetime import datetime, timezone, timedelta
 CST = timezone(timedelta(hours=8))
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-DEFAULT_SQL = os.path.join(SCRIPT_DIR, 'database.sql')
+DEFAULT_SQL = os.path.join(SCRIPT_DIR, 'data.sql')
 OUTPUT_JS = os.path.join(SCRIPT_DIR, 'data.js')
 
 
