@@ -220,10 +220,9 @@ function drawRingChart(minuteData) {
         ctx.lineWidth = 0.5;
         ctx.stroke();
 
-        // 标签
-        const labelAngle = angle + (Math.PI * 2 / 24) / 2; // 居中
-        const lx = cx + labelR * Math.cos(labelAngle);
-        const ly = cy + labelR * Math.sin(labelAngle);
+        // 标签 — 放在分隔线上（而非扇区中间），确保0在正上方
+        const lx = cx + labelR * Math.cos(angle);
+        const ly = cy + labelR * Math.sin(angle);
         if (h % 3 === 0) {
             ctx.fillStyle = '#8892a8';
             ctx.font = 'bold 12px Inter, sans-serif';
