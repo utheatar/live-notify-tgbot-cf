@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>主播直播数据可视化</title>
+    <meta name="description" content="B站/抖音主播直播数据分析与可视化面板">
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <script
+        src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-glow"></div>
+            <h1 class="header-title">
+                <span class="header-icon">📊</span>
+                主播直播数据分析
+            </h1>
+            <p class="header-sub">Live Streaming Analytics Dashboard</p>
+        </header>
+
+        <!-- Selectors -->
+        <nav class="selector-bar">
+            <div class="selector-group">
+                <label for="platform-select" class="selector-label">平台</label>
+                <select id="platform-select" class="selector">
+                    <option value="">-- 选择平台 --</option>
+                </select>
+            </div>
+            <div class="selector-group">
+                <label for="streamer-select" class="selector-label">主播</label>
+                <select id="streamer-select" class="selector" disabled>
+                    <option value="">-- 先选择平台 --</option>
+                </select>
+            </div>
+            <div id="streamer-info" class="streamer-info hidden"></div>
+        </nav>
+
+        <!-- Charts Grid -->
+        <main class="charts-grid" id="charts-container">
+            <div class="empty-state" id="empty-state">
+                <div class="empty-icon">🎮</div>
+                <p>选择一个平台和主播来查看数据</p>
+            </div>
+
+            <!-- Chart 1: 24h Ring -->
+            <section class="chart-card" id="card-ring" style="display:none">
+                <div class="card-header">
+                    <h2 class="card-title">🕐 开播时间分布</h2>
+                    <p class="card-desc">24小时环形热力图，颜色越深表示该时段开播越频繁</p>
+                </div>
+                <div class="card-body ring-container">
+                    <canvas id="chart-ring" width="400" height="400"></canvas>
+                    <div id="ring-tooltip" class="ring-tooltip hidden"></div>
+                </div>
+            </section>
+
+            <!-- Chart 2: Followers -->
+            <section class="chart-card" id="card-followers" style="display:none">
+                <div class="card-header">
+                    <h2 class="card-title">👥 关注者数量变化</h2>
+                    <p class="card-desc">粉丝/关注者数量随时间变化趋势</p>
+                </div>
+                <div class="card-body">
+                    <canvas id="chart-followers"></canvas>
+                </div>
+            </section>
+
+            <!-- Chart 3: Viewers per session -->
+            <section class="chart-card wide" id="card-viewers" style="display:none">
+                <div class="card-header">
+                    <h2 class="card-title">👁️ 直播间人数变化</h2>
+                    <p class="card-desc">各场次按开播后时间对比，不同颜色代表不同场直播</p>
+                </div>
+                <div class="card-body">
+                    <canvas id="chart-viewers"></canvas>
+                </div>
+            </section>
+
+            <!-- Chart 4: Guard -->
+            <section class="chart-card" id="card-guard" style="display:none">
+                <div class="card-header">
+                    <h2 class="card-title">⚓ 大航海上舰人数</h2>
+                    <p class="card-desc">舰长/提督/总督总人数随时间变化</p>
+                </div>
+                <div class="card-body">
+                    <canvas id="chart-guard"></canvas>
+                </div>
+            </section>
+        </main>
+
+        <footer class="footer">
+            <p>数据来源: Cloudflare D1 · 仅供分析参考</p>
+        </footer>
+    </div>
+
+    <script src="data.js"></script>
+    <script src="app.js"></script>
+</body>
+
+</html>
