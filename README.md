@@ -321,7 +321,7 @@ npm run cf-typegen
 1. **导出生产环境数据**
    使用 wrangler 将 D1 数据库导出为 SQL 文件：
    ```bash
-   npx wrangler d1 export live_notify --remote --output=src/analyze/data.sql
+   npx wrangler d1 export live_notify --remote --output=./src/analyze/data.sql
    ```
 
 2. **生成前端数据**
