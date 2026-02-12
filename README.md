@@ -303,6 +303,44 @@ npm run cf-typegen
 - 任何 cookie 都有可能过期，需要定期更新
 - Bilibili 直播期间每分钟写入 D1 记录；抖音仅在状态变化时写入
 
+## 数据分析与可视化
+
+本项目提供了一个简单的本地数据分析工具，用于可视化 D1 数据库中积累的直播数据。
+
+### 工具目录
+
+位于 `src/analyze/` 目录下：
+- `data.sql`: 导出的数据库文件（需手动放置或通过命令生成）
+- `parse_sql.py`: 解析 SQL 并生成前端所需数据的 Python 脚本
+- `data.js`: 脚本生成的 JSON 数据文件（**不要提交到 git**）
+- `index.html`: 数据可视化网页入口
+- `app.js` / `style.css`: 前端逻辑与样式
+
+### 使用步骤
+
+1. **导出生产环境数据**
+   使用 wrangler 将 D1 数据库导出为 SQL 文件：
+   ```bash
+   npx wrangler d1 export live_notify --remote --output=src/analyze/data.sql
+   ```
+
+2. **生成前端数据**
+   运行 Python 脚本解析 SQL 并生成 `data.js`：
+   ```bash
+   # 确保已安装 Python 3
+   python src/analyze/parse_sql.py
+   ```
+   脚本将读取 `data.sql`，进行数据清洗和聚合，最终输出 `window.LIVE_DATA` 对象到 `data.js`。
+
+3. **查看可视化报表**
+   直接在浏览器中打开 `src/analyze/index.html` 文件。
+   
+   **功能特性**：
+   - **多平台支持**：切换查看 Bilibili 和抖音的主播数据
+   - **直播习惯分析**：通过 24 小时环形图展示主播通常的直播时段
+   - **趋势追踪**：粉丝数/关注数/舰长数的历史变化趋势
+   - **场次详情**：查看 Bilibili 单场直播的在线人数和舰长数变化曲线
+
 ## 许可证
 
 MIT
