@@ -246,7 +246,7 @@ function drawRingChart(minuteData) {
 
     // Hover 交互
     canvas._minuteData = minuteData;
-    canvas._params = { cx, cy, outerR, innerR, segAngle, startOffset, totalSegments };
+    canvas._params = { cx, cy, outerR, innerR, segAngle, startOffset, totalSegments, W, H };
     canvas.onmousemove = ringMouseMove;
     canvas.onmouseleave = () => {
         document.getElementById('ring-tooltip').classList.add('hidden');
@@ -256,9 +256,11 @@ function drawRingChart(minuteData) {
 function ringMouseMove(e) {
     const canvas = e.target;
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const { cx, cy, outerR, innerR, segAngle, startOffset, totalSegments } = canvas._params;
+    const { cx, cy, outerR, innerR, segAngle, startOffset, totalSegments, W, H } = canvas._params;
+
+    // 将鼠标坐标从实际渲染尺寸映射到绘图坐标系 (W×H)
+    const x = (e.clientX - rect.left) * W / rect.width;
+    const y = (e.clientY - rect.top) * H / rect.height;
 
     const dx = x - cx, dy = y - cy;
     const dist = Math.sqrt(dx * dx + dy * dy);

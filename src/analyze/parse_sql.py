@@ -15,7 +15,7 @@ from datetime import datetime, timezone, timedelta
 CST = timezone(timedelta(hours=8))
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-DEFAULT_SQL = os.path.join(SCRIPT_DIR, '..', 'database.sql')
+DEFAULT_SQL = os.path.join(SCRIPT_DIR, 'database.sql')
 OUTPUT_JS = os.path.join(SCRIPT_DIR, 'data.js')
 
 
@@ -82,36 +82,19 @@ def process_bilibili(conn: sqlite3.Connection) -> dict:
         records = info['records']
 
         # ---- 1. 直播时间热力分布 (1440分钟粒度) ----
-        # 对每个直播场次，从首条记录到末条记录的所有分钟都计入
-        # 先按 live_time 分组，找到每个 session 的 record_time 范围
-        session_time_ranges = {}  # live_time -> (min_record_time, max_record_time)
-        for r in records:
-            if r['live_status'] == 1 and r['live_time'] and r['live_time'] > 0:
-                lt = r['live_time']
-                rt = r['record_time']
-                if lt not in session_time_ranges:
-                    session_time_ranges[lt] = (rt, rt)
-                else:
-                    prev_min, prev_max = session_time_ranges[lt]
-                    session_time_ranges[lt] = (min(prev_min, rt), max(prev_max, rt))
-
+        # 对每条 live_status=1 的记录，将其 record_time 对应的分钟 +1
+        # 使用 (live_time, minute_idx) 去重，同一场次同一分钟只计一次
         minute_counts = [0] * 1440
-        for lt, (rt_min, rt_max) in session_time_ranges.items():
-            # 将 record_time 范围转为分钟级时间点
-            dt_start = datetime.fromtimestamp(rt_min, tz=CST)
-            dt_end = datetime.fromtimestamp(rt_max, tz=CST)
-            start_min = dt_start.hour * 60 + dt_start.minute
-            end_min = dt_end.hour * 60 + dt_end.minute
-            # 处理跨午夜的情况
-            if end_min >= start_min:
-                for m in range(start_min, end_min + 1):
-                    minute_counts[m] += 1
-            else:
-                # 跨午夜: start_min -> 1439, 然后 0 -> end_min
-                for m in range(start_min, 1440):
-                    minute_counts[m] += 1
-                for m in range(0, end_min + 1):
-                    minute_counts[m] += 1
+        seen_session_minutes = set()  # (live_time, minute_idx)
+        for r in records:
+            if r['live_status'] == 1:
+                dt = datetime.fromtimestamp(r['record_time'], tz=CST)
+                minute_idx = dt.hour * 60 + dt.minute
+                lt = r.get('live_time', 0) or 0
+                key = (lt, minute_idx)
+                if key not in seen_session_minutes:
+                    seen_session_minutes.add(key)
+                    minute_counts[minute_idx] += 1
 
         # ---- 2. 粉丝/关注者曲线 ----
         attention_series = []
@@ -169,7 +152,8 @@ def process_bilibili(conn: sqlite3.Connection) -> dict:
         # ---- 4. 大航海上舰人数变化 ----
         guard_series = []
         for r in records:
-            guard_series.append({
+            if r['live_status'] == 1:
+                guard_series.append({
                 'time': ts_to_iso(r['record_time']),
                 'timestamp': r['record_time'],
                 'value': r['guard_num'],
