@@ -325,6 +325,7 @@ npm run cf-typegen
    ```
    延迟导出（在Windows上使用PowerShell计算小时对应的秒数，例如5小时）
    ```powershell
+   # 首先确保你已经通过npx wrangler login登录
    Start-Sleep -Seconds (5 * 3600); echo "y" | npx wrangler d1 export live_notify --remote --output=./src/analyze/data.sql
    ```
 
@@ -332,7 +333,7 @@ npm run cf-typegen
    运行 Python 脚本解析 SQL 并生成 `data.js`：
    ```bash
    # 确保已安装 Python 3
-   python src/analyze/parse_sql.py [path/to/data.sql]
+   python src/analyze/parse_sql.py --sql [path/to/data.sql]
    ```
    脚本将读取 `data.sql`，进行数据清洗和聚合，最终输出 `window.LIVE_DATA` 对象到 `data.js`。
 
