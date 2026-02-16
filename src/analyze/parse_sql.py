@@ -1,14 +1,15 @@
 """
 parse_sql.py
 将 database.sql 导入内存 SQLite，提取主播直播数据并输出为 data.js
-用法: python src/analyze/parse_sql.py [--sql path/to/database.sql]
+用法: python src/analyze/parse_sql.py [path/to/database.sql]
 """
 
 import sqlite3
 import json
 import os
-import sys
+
 import re
+import argparse
 from datetime import datetime, timezone, timedelta
 
 # 时区: UTC+8
@@ -248,9 +249,11 @@ def process_douyin(conn: sqlite3.Connection) -> dict:
 
 
 def main():
-    sql_path = DEFAULT_SQL
-    if len(sys.argv) > 2 and sys.argv[1] == '--sql':
-        sql_path = sys.argv[2]
+    parser = argparse.ArgumentParser(description='Parse SQL export from D1 and generate data.js')
+    parser.add_argument('sql_path', nargs='?', default=DEFAULT_SQL, help='Path to the .sql file (default: src/analyze/data.sql)')
+    
+    args = parser.parse_args()
+    sql_path = args.sql_path
 
     sql_path = os.path.abspath(sql_path)
     print(f"[*] Loading SQL from: {sql_path}")
