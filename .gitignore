@@ -170,5 +170,5 @@ dist
 docs/
 .claude/
 output/
-src/analyze/data.*
+src/analyze/data*.*
 
